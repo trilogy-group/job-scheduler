@@ -7,11 +7,9 @@ A Claude Code skill that routes every Fireworks fine-tuning job (SFT + DPO) thro
 The whole `job-scheduler` repository is a Claude Code marketplace. From any Claude Code session:
 
 ```
-/plugin marketplace add <github-owner>/<github-repo>
+/plugin marketplace add trilogy-group/job-scheduler
 /plugin install finetune-queue@job-scheduler
 ```
-
-Replace `<github-owner>/<github-repo>` with the actual path once this repo is pushed (e.g. `trilogy/job-scheduler`).
 
 After install, restart Claude Code. The `finetune-queue` skill will be available to your agents automatically when they try to create, list, cancel, or monitor Fireworks fine-tuning jobs.
 

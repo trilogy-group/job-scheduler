@@ -94,7 +94,7 @@ Design lives in `openspec/changes/add-finetune-scheduler/`. Task tracking in bea
 This repo doubles as a Claude Code marketplace. Agents that install the `finetune-queue` plugin get a skill that routes fine-tuning calls through the scheduler (and refuses to use `firectl` / the Fireworks API directly).
 
 ```
-/plugin marketplace add <github-owner>/<github-repo>
+/plugin marketplace add trilogy-group/job-scheduler
 /plugin install finetune-queue@job-scheduler
 ```
 
