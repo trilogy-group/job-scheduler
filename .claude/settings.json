@@ -1,4 +1,7 @@
 {
+  "enabledPlugins": {
+    "supabase@claude-plugins-official": true
+  },
   "hooks": {
     "PreCompact": [
       {
