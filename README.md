@@ -89,6 +89,17 @@ Design lives in `openspec/changes/add-finetune-scheduler/`. Task tracking in bea
 
 7. Register the pg_cron tick. See `supabase/migrations/0002_schedule_tick.sql` — after editing the URL + secret reference for your project, `supabase db push` it.
 
+## Skill for teammates' Claude Code agents
+
+This repo doubles as a Claude Code marketplace. Agents that install the `finetune-queue` plugin get a skill that routes fine-tuning calls through the scheduler (and refuses to use `firectl` / the Fireworks API directly).
+
+```
+/plugin marketplace add <github-owner>/<github-repo>
+/plugin install finetune-queue@job-scheduler
+```
+
+Two env vars on the caller's machine: `SUPABASE_URL` (above) and `SFTQ_API_KEY` (per-user, ask Anirudh). See [`plugins/finetune-queue/README.md`](plugins/finetune-queue/README.md).
+
 ## Using the API
 
 See `examples/` for full scripts. Quick shape:

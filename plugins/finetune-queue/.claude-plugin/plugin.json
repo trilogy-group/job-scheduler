@@ -1,0 +1,19 @@
+{
+  "name": "finetune-queue",
+  "version": "0.1.0",
+  "description": "Submit, list, monitor, and cancel Fireworks fine-tuning jobs (SFT + DPO) via the Trilogy team's fair-scheduler queue. Blocks direct firectl / Fireworks API use for fine-tuning.",
+  "author": {
+    "name": "Trilogy ELA team"
+  },
+  "license": "UNLICENSED",
+  "skills": "./skills/",
+  "keywords": [
+    "fireworks",
+    "fine-tuning",
+    "sft",
+    "dpo",
+    "scheduler",
+    "trilogy",
+    "model-invoked"
+  ]
+}

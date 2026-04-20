@@ -1,0 +1,25 @@
+{
+  "name": "job-scheduler",
+  "owner": {
+    "name": "Trilogy ELA team",
+    "email": "anirudh.shrikanth@trilogy.com"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for the Trilogy Fireworks fine-tuning scheduler.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "finetune-queue",
+      "source": "./plugins/finetune-queue",
+      "description": "Route Fireworks SFT and DPO jobs through the team's fair-scheduler queue. Tells agents to never call firectl or the Fireworks fine-tuning API directly.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Trilogy ELA team"
+      },
+      "keywords": ["fireworks", "fine-tuning", "sft", "dpo", "scheduler", "trilogy"],
+      "category": "infra",
+      "tags": ["model-invoked", "scheduler", "fireworks"]
+    }
+  ]
+}
