@@ -23,3 +23,6 @@ supabase/.temp/
 .DS_Store
 *.swp
 *.swo
+
+# Claude Code local (per-user) settings
+.claude/settings.local.json

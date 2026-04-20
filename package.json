@@ -1,0 +1,21 @@
+{
+  "name": "job-scheduler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fair FIFO scheduler for Fireworks fine-tuning jobs, backed by Supabase.",
+  "scripts": {
+    "seed": "node scripts/seed_users.js",
+    "issue-key": "node scripts/issue_key.js",
+    "revoke-key": "node scripts/revoke_key.js",
+    "dump": "node scripts/dump_state.js",
+    "test": "node --test \"tests/*.test.js\""
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
