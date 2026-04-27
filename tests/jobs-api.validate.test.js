@@ -24,8 +24,23 @@ test('validateEnqueue accepts DPO and preserves display_name + gpu_count', () =>
   assert.equal(r.value.gpu_count, 8);
 });
 
+test('validateEnqueue accepts RFT', () => {
+  const r = validateEnqueue({
+    kind: 'RFT',
+    display_name: 'rl run',
+    fireworks_payload: {
+      dataset: 'accounts/trilogy/datasets/foo',
+      evaluator: 'accounts/trilogy/evaluators/foo-scorer',
+      lossConfig: { method: 'GRPO' },
+      inferenceParameters: { responseCandidatesCount: 4 },
+    },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.value.kind, 'RFT');
+});
+
 test('validateEnqueue rejects unknown kind', () => {
-  const r = validateEnqueue({ kind: 'RFT', fireworks_payload: {} });
+  const r = validateEnqueue({ kind: 'PPO', fireworks_payload: {} });
   assert.equal(r.ok, false);
   assert.match(r.err.message, /kind must be/);
 });

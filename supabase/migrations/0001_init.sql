@@ -42,7 +42,7 @@ create index if not exists api_keys_user_id_idx on public.api_keys(user_id);
 create table if not exists public.jobs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete restrict,
-  kind text not null check (kind in ('SFT','DPO')),
+  kind text not null check (kind in ('SFT','DPO','RFT')),
   state text not null
     check (state in ('QUEUED','PROGRESS','SUCCESS','FAIL','CANCELLED')),
   display_name text,

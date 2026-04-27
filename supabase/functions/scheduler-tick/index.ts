@@ -4,6 +4,7 @@
 import { dbClient } from "../_shared/db.ts";
 import { error, json } from "../_shared/response.ts";
 import {
+  extractGpuCount,
   FireworksClient,
   isFireworksError,
   isTerminal,
@@ -37,7 +38,7 @@ Deno.serve(async (req: Request) => {
       queued_remaining: 0,
       fw_available: 0,
       fw_quota_name: "" as string,
-      by_kind: { SFT: 0, DPO: 0 } as Record<Kind, number>,
+      by_kind: { SFT: 0, DPO: 0, RFT: 0 } as Record<Kind, number>,
     };
 
     // --- Reconcile PROGRESS jobs against Fireworks ----------------------
@@ -87,14 +88,33 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // --- Discover live GPU headroom via /quotas -------------------------
+    // --- Discover live GPU headroom ------------------------------------
+    // We trust Fireworks' `maxValue` (account ceiling, rarely changes) but
+    // NOT `usage` — that counter has been observed to get stuck at the max
+    // after jobs terminate (see Fireworks support ticket re: stale training
+    // quota). Instead, compute in-use by summing gpu_count across live
+    // non-terminal SFT + DPO jobs on Fireworks.
     let fwAvailable = 0;
     try {
-      const q = await fw.getTrainingGpuQuota();
-      fwAvailable = Math.max(0, q.maxValue - q.usage);
-      summary.fw_quota_name = q.name;
+      const [quota, active] = await Promise.all([
+        fw.getTrainingGpuQuota(),
+        fw.listActiveJobsAllKinds(),
+      ]);
+      const computedUsage = active.reduce(
+        (sum, a) => sum + extractGpuCount(a.job, 4),
+        0,
+      );
+      fwAvailable = Math.max(0, quota.maxValue - computedUsage);
+      summary.fw_quota_name = quota.name;
+      // Log when Fireworks' own usage counter disagrees with reality — useful
+      // signal for ops and for confirming the bug is gone once it's fixed.
+      if (quota.usage !== computedUsage) {
+        console.warn(
+          `quota.usage drift: fireworks reports usage=${quota.usage}, computed=${computedUsage} from ${active.length} active jobs`,
+        );
+      }
     } catch (e) {
-      console.warn("getTrainingGpuQuota failed; skipping admission", e);
+      console.warn("getTrainingGpuQuota / listActiveJobs failed; skipping admission", e);
       return json({ ...summary, skipped_admission: true });
     }
     summary.fw_available = fwAvailable;

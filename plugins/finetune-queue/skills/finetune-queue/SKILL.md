@@ -1,8 +1,8 @@
 ---
 name: finetune-queue
-description: Submit, list, monitor, and cancel Fireworks fine-tuning jobs (SFT + DPO) for the Trilogy team via the fair-scheduler queue. ALWAYS use this instead of calling the Fireworks fine-tuning API directly or running `firectl supervised-fine-tuning-job ...` / `firectl dpoj ...`.
+description: Submit, list, monitor, and cancel Fireworks fine-tuning jobs (SFT, DPO, RFT) for the Trilogy team via the fair-scheduler queue. ALWAYS use this instead of calling the Fireworks fine-tuning API directly or running `firectl supervised-fine-tuning-job ...`, `firectl dpoj ...`, or `firectl rft-job ...`.
 disable-model-invocation: false
-argument-hint: [enqueue|list|status|cancel] [--kind SFT|DPO] [--id <job-id>]
+argument-hint: [enqueue|list|status|cancel] [--kind SFT|DPO|RFT] [--id <job-id>]
 ---
 
 # Fireworks Fine-Tuning Scheduler
@@ -14,6 +14,7 @@ A fair-FIFO queue in front of the Fireworks `trilogy` account. Enforces at most 
 **DO NOT** call the Fireworks fine-tuning HTTP API directly for any mutation.
 **DO NOT** run `firectl supervised-fine-tuning-job create|cancel|resume|get|list`.
 **DO NOT** run `firectl dpoj create|cancel|resume|list`.
+**DO NOT** run `firectl rft-job create|cancel|resume|list` or POST to `/reinforcementFineTuningJobs` directly.
 
 The whole point of this scheduler is that agents running in parallel would otherwise violate fairness rules non-deterministically. Direct access breaks the guarantee.
 
@@ -57,7 +58,7 @@ curl -sS -X POST "$SUPABASE_URL/functions/v1/jobs-api/jobs" \
 ```
 
 Fields:
-- `kind` (required): `"SFT"` or `"DPO"` — selects which Fireworks endpoint the scheduler submits to.
+- `kind` (required): `"SFT"`, `"DPO"`, or `"RFT"` — selects which Fireworks endpoint the scheduler submits to (`/supervisedFineTuningJobs`, `/dpoJobs`, `/reinforcementFineTuningJobs` respectively).
 - `fireworks_payload` (required): the **verbatim** Fireworks request body. The scheduler passes it through on admission. Build it exactly as if you were calling Fireworks directly — see the `fireworks-training` skill for proven parameter values.
 - `display_name` (optional): shows up in `list`/`status` output.
 - `gpu_count` (optional, default 4): your best estimate of GPUs this job will use. Used for admission gating; live `usage` is re-read from Fireworks on every scheduler tick, so this doesn't need to be perfect.
@@ -212,19 +213,63 @@ def cancel(job_id):      return _req("DELETE", f"/jobs/{job_id}")
 
 ## Payload reference (Fireworks body shapes)
 
-Both kinds accept the full Fireworks request body inside `fireworks_payload`. Refer to the `fireworks-training` skill for proven parameters:
+All three kinds accept the full Fireworks request body inside `fireworks_payload`. Refer to the `fireworks-training` skill for proven parameters:
 
-- SFT: `baseModel`, `dataset`, `outputModel`, `evaluationDataset` (optional), `epochs`, `learningRate`, `loraRank`, `maxContextLength`, `learningRateWarmupSteps`, `batchSize`, `gradientAccumulationSteps`.
-- DPO: `dataset`, `lossConfig.method = "DPO"`, `trainingConfig.{warmStartFrom, outputModel, epochs, learningRate, loraRank, maxContextLength, ...}`.
+- **SFT** (`/supervisedFineTuningJobs`): flat shape. `baseModel`, `dataset`, `outputModel`, `evaluationDataset` (optional), `epochs`, `learningRate`, `loraRank`, `maxContextLength`, `learningRateWarmupSteps`, `batchSize`, `gradientAccumulationSteps`.
+- **DPO** (`/dpoJobs`): nested. `dataset`, `lossConfig.method = "DPO"`, `trainingConfig.{warmStartFrom, outputModel, epochs, learningRate, loraRank, maxContextLength, ...}`.
+- **RFT** (`/reinforcementFineTuningJobs`): nested. **Required**: `dataset`, `evaluator` (resource name of a reward function). Optional: `displayName`, `evaluationDataset`, `trainingConfig.{baseModel, learningRate, loraRank, epochs, batchSize}`, `lossConfig.{method (default GRPO; one of GRPO, DPO, ORPO, DAPO, GSPO_TOKEN), klBeta}`, `inferenceParameters.{maxOutputTokens, temperature, topP, responseCandidatesCount (≥ 2 required)}`, `nodeCount`, `maxConcurrentRollouts`, `maxConcurrentEvaluations`, `wandbConfig`.
+
+Example RFT payload:
+```json
+{
+  "kind": "RFT",
+  "display_name": "math-rft-grpo-v1",
+  "fireworks_payload": {
+    "displayName": "math-rft-grpo-v1",
+    "dataset": "accounts/trilogy/datasets/math-grpo-prompts-v1",
+    "evaluator": "accounts/trilogy/evaluators/math-correct-v1",
+    "trainingConfig": {
+      "baseModel": "accounts/fireworks/models/qwen3-14b",
+      "learningRate": 1e-5,
+      "loraRank": 32,
+      "epochs": 1,
+      "batchSize": 64
+    },
+    "lossConfig": { "method": "GRPO", "klBeta": 0.1 },
+    "inferenceParameters": {
+      "maxOutputTokens": 1024,
+      "temperature": 0.7,
+      "topP": 0.9,
+      "responseCandidatesCount": 4
+    }
+  }
+}
+```
+
+**RFT-specific gotchas:**
+- `evaluator` is required and must reference an existing Fireworks evaluator. Forgetting it 400s.
+- `inferenceParameters.responseCandidatesCount` must be ≥ 2 (RFT needs multiple rollouts to compute preferences).
+- Default `lossConfig.method` is `GRPO`. Don't assume `DPO`.
+- All three kinds (SFT + DPO + RFT) share the same `training-h200-count` quota and the same per-user-cap-of-1 rule.
 
 The scheduler does **not** validate Fireworks-specific field names — it passes them through. A bad shape will fail at Fireworks submission time and the job will go to `FAIL`.
+
+## Cancellation semantics under the hood
+
+When you `DELETE /jobs/:id` (our endpoint), the scheduler translates that to the right Fireworks call based on `kind`:
+- **SFT, DPO**: `DELETE /...Jobs/{name}` — Fireworks removes the resource entirely. Subsequent `GET` on Fireworks returns 404.
+- **RFT**: `POST /reinforcementFineTuningJobs/{name}:cancel` — Fireworks transitions the job to `JOB_STATE_CANCELLED` but preserves the resource. (RFT is the only kind with a documented `:cancel` endpoint.)
+
+This asymmetry is hidden from the API user — you always call `DELETE /jobs/:id`.
 
 ## What NOT to do (recap)
 
 - ❌ `curl -X POST https://api.fireworks.ai/v1/accounts/trilogy/supervisedFineTuningJobs ...`
 - ❌ `curl -X POST https://api.fireworks.ai/v1/accounts/trilogy/dpoJobs ...`
+- ❌ `curl -X POST https://api.fireworks.ai/v1/accounts/trilogy/reinforcementFineTuningJobs ...`
 - ❌ `firectl supervised-fine-tuning-job create|cancel|resume`
 - ❌ `firectl dpoj create|cancel|resume`
+- ❌ `firectl rft-job create|cancel|resume`
 - ❌ Using a teammate's API key (each key is per-user; the scheduler derives `user_id` from it).
 
 Every one of those violates the fairness guarantee. Always go through `jobs-api`.

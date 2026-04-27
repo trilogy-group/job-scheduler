@@ -66,11 +66,22 @@ test('FireworksClient routes DPO to /dpoJobs', async () => {
   assert.ok(calls[0].endsWith('/dpoJobs'));
 });
 
-test('listActiveJobs filters out terminal states', async () => {
+test('FireworksClient routes RFT to /reinforcementFineTuningJobs', async () => {
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return new Response(JSON.stringify({ name: 'r1', state: 'JOB_STATE_CREATING' }), { status: 200 });
+  };
+  const c = new FireworksClient('KEY', fakeFetch);
+  await c.createJob('RFT', { dataset: 'x', evaluator: 'y' });
+  assert.ok(calls[0].endsWith('/reinforcementFineTuningJobs'));
+});
+
+test('listActiveJobs reads SFT array under supervisedFineTuningJobs key', async () => {
   const fakeFetch = async () =>
     new Response(
       JSON.stringify({
-        jobs: [
+        supervisedFineTuningJobs: [
           { name: 'a', state: 'JOB_STATE_RUNNING' },
           { name: 'b', state: 'JOB_STATE_COMPLETED' },
           { name: 'c', state: 'JOB_STATE_CREATING' },
@@ -83,6 +94,44 @@ test('listActiveJobs filters out terminal states', async () => {
   const c = new FireworksClient('KEY', fakeFetch);
   const active = await c.listActiveJobs('SFT');
   assert.deepEqual(active.map((j) => j.name), ['a', 'c']);
+});
+
+test('listActiveJobs reads DPO array under dpoJobs key', async () => {
+  const fakeFetch = async () =>
+    new Response(
+      JSON.stringify({ dpoJobs: [{ name: 'd1', state: 'JOB_STATE_RUNNING' }] }),
+      { status: 200 },
+    );
+  const c = new FireworksClient('KEY', fakeFetch);
+  const active = await c.listActiveJobs('DPO');
+  assert.deepEqual(active.map((j) => j.name), ['d1']);
+});
+
+test('listActiveJobs reads RFT array under reinforcementFineTuningJobs key', async () => {
+  const fakeFetch = async () =>
+    new Response(
+      JSON.stringify({
+        reinforcementFineTuningJobs: [
+          { name: 'r1', state: 'JOB_STATE_RUNNING' },
+          { name: 'r2', state: 'JOB_STATE_COMPLETED' },
+        ],
+      }),
+      { status: 200 },
+    );
+  const c = new FireworksClient('KEY', fakeFetch);
+  const active = await c.listActiveJobs('RFT');
+  assert.deepEqual(active.map((j) => j.name), ['r1']);
+});
+
+test('listActiveJobs falls back to body.jobs for forward compatibility', async () => {
+  const fakeFetch = async () =>
+    new Response(
+      JSON.stringify({ jobs: [{ name: 'fallback', state: 'JOB_STATE_RUNNING' }] }),
+      { status: 200 },
+    );
+  const c = new FireworksClient('KEY', fakeFetch);
+  const active = await c.listActiveJobs('SFT');
+  assert.deepEqual(active.map((j) => j.name), ['fallback']);
 });
 
 test('createJob surfaces quota errors with isQuotaError=true', async () => {
@@ -111,24 +160,28 @@ test('createJob surfaces non-quota 4xx with isQuotaError=false', async () => {
   }
 });
 
-test('listActiveJobsAllKinds fans out to both endpoints', async () => {
+test('listActiveJobsAllKinds fans out to all three endpoints (SFT+DPO+RFT)', async () => {
   const hits = [];
   const fakeFetch = async (url) => {
     hits.push(url);
     if (url.endsWith('/supervisedFineTuningJobs')) {
-      return new Response(JSON.stringify({ jobs: [{ name: 's1', state: 'JOB_STATE_RUNNING' }] }), { status: 200 });
+      return new Response(JSON.stringify({ supervisedFineTuningJobs: [{ name: 's1', state: 'JOB_STATE_RUNNING' }] }), { status: 200 });
     }
-    return new Response(JSON.stringify({ jobs: [{ name: 'd1', state: 'JOB_STATE_RUNNING' }] }), { status: 200 });
+    if (url.endsWith('/dpoJobs')) {
+      return new Response(JSON.stringify({ dpoJobs: [{ name: 'd1', state: 'JOB_STATE_RUNNING' }] }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ reinforcementFineTuningJobs: [{ name: 'r1', state: 'JOB_STATE_RUNNING' }] }), { status: 200 });
   };
   const c = new FireworksClient('KEY', fakeFetch);
   const all = await c.listActiveJobsAllKinds();
-  assert.equal(all.length, 2);
-  assert.deepEqual(all.map((a) => a.kind).sort(), ['DPO', 'SFT']);
+  assert.equal(all.length, 3);
+  assert.deepEqual(all.map((a) => a.kind).sort(), ['DPO', 'RFT', 'SFT']);
   assert.ok(hits.some((u) => u.endsWith('/supervisedFineTuningJobs')));
   assert.ok(hits.some((u) => u.endsWith('/dpoJobs')));
+  assert.ok(hits.some((u) => u.endsWith('/reinforcementFineTuningJobs')));
 });
 
-test('cancelJob sends DELETE (not POST :cancel)', async () => {
+test('cancelJob SFT sends DELETE (no :cancel endpoint exists)', async () => {
   const calls = [];
   const fakeFetch = async (url, init) => {
     calls.push({ url, method: init?.method });
@@ -139,6 +192,30 @@ test('cancelJob sends DELETE (not POST :cancel)', async () => {
   assert.equal(calls[0].method, 'DELETE');
   assert.ok(calls[0].url.endsWith('/supervisedFineTuningJobs/abc123'));
   assert.ok(!calls[0].url.includes(':cancel'));
+});
+
+test('cancelJob DPO sends DELETE (no :cancel endpoint exists)', async () => {
+  const calls = [];
+  const fakeFetch = async (url, init) => {
+    calls.push({ url, method: init?.method });
+    return new Response('{}', { status: 200 });
+  };
+  const c = new FireworksClient('KEY', fakeFetch);
+  await c.cancelJob('DPO', 'accounts/trilogy/dpoJobs/d1');
+  assert.equal(calls[0].method, 'DELETE');
+  assert.ok(!calls[0].url.includes(':cancel'));
+});
+
+test('cancelJob RFT sends POST :cancel (asymmetric — only RFT has :cancel)', async () => {
+  const calls = [];
+  const fakeFetch = async (url, init) => {
+    calls.push({ url, method: init?.method });
+    return new Response('{}', { status: 200 });
+  };
+  const c = new FireworksClient('KEY', fakeFetch);
+  await c.cancelJob('RFT', 'accounts/trilogy/reinforcementFineTuningJobs/r1');
+  assert.equal(calls[0].method, 'POST');
+  assert.ok(calls[0].url.endsWith('/reinforcementFineTuningJobs/r1:cancel'));
 });
 
 test('getTrainingGpuQuota finds matching quota by name pattern', async () => {

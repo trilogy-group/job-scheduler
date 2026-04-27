@@ -3,7 +3,7 @@
 
 import type { Kind } from "../_shared/fireworks.ts";
 
-export const VALID_KINDS = new Set<Kind>(["SFT", "DPO"]);
+export const VALID_KINDS = new Set<Kind>(["SFT", "DPO", "RFT"]);
 export const TERMINAL_STATES = new Set(["SUCCESS", "FAIL", "CANCELLED"]);
 
 export interface EnqueueInput {
@@ -27,7 +27,7 @@ export function validateEnqueue(
 
   const kind = body.kind;
   if (typeof kind !== "string" || !VALID_KINDS.has(kind as Kind)) {
-    return { ok: false, err: { message: "kind must be 'SFT' or 'DPO'" } };
+    return { ok: false, err: { message: "kind must be 'SFT', 'DPO', or 'RFT'" } };
   }
 
   const payload = body.fireworks_payload;
