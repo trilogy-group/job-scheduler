@@ -229,7 +229,13 @@ export function isQuotaExhaustion(status: number, body: string): boolean {
   if (status < 400 || status >= 500) return false;
   const m = body.match(/in use:\s*(\d+),\s*quota:\s*(\d+)/i);
   if (!m) return false;
-  return parseInt(m[1], 10) >= parseInt(m[2], 10);
+  const inUse = parseInt(m[1], 10);
+  const quota = parseInt(m[2], 10);
+  // A zero-capacity quota means that GPU type is not allocated to the
+  // account (e.g. training-b200-count = 0).  That is a permanent
+  // configuration mismatch, not temporary exhaustion, so the job should
+  // be marked FAIL rather than blocking the whole queue.
+  return quota > 0 && inUse >= quota;
 }
 
 async function toError(res: Response): Promise<FireworksError> {
