@@ -1,0 +1,215 @@
+{
+  "goal": "Make the job queue provider-agnostic (Fireworks + Prime Intellect)",
+  "milestones": [
+    {
+      "id": "m1",
+      "title": "Provider Adapter Interface & Fireworks Adapter Extraction",
+      "description": "Create the ProviderAdapter interface and refactor the existing Fireworks-specific code into a FireworksAdapter that implements it. No behavior changes — the scheduler and API still use Fireworks exclusively. This milestone isolates the abstraction so subsequent providers can plug in cleanly.",
+      "files_changed": [
+        "supabase/functions/_shared/providers/adapter.ts",
+        "supabase/functions/_shared/providers/fireworks-adapter.ts",
+        "supabase/functions/_shared/fireworks.ts (deprecated, re-export from adapter)",
+        "supabase/functions/scheduler-tick/index.ts",
+        "supabase/functions/jobs-api/index.ts",
+        "supabase/functions/jobs-api/validate.ts"
+      ],
+      "tests": [
+        "tests/providers/fireworks-adapter.test.js",
+        "tests/providers/adapter-interface.test.js",
+        "tests/scheduler-tick.provider-agnostic.test.js"
+      ],
+      "acceptance_criteria": [
+        "ProviderAdapter interface is defined with checkAvailability, submitJob, getJobStatus, cancelJob, listActiveJobs",
+        "FireworksAdapter implements ProviderAdapter and delegates to existing FireworksClient",
+        "scheduler-tick uses ProviderAdapter via a factory, not FireworksClient directly",
+        "jobs-api uses ProviderAdapter for cancel and status operations",
+        "All existing tests still pass (fireworks.test.js, admission.test.js, jobs-api.validate.test.js)",
+        "New unit tests verify the adapter interface and FireworksAdapter delegation"
+      ],
+      "coding_worker_prompt": "Create a provider-adapter abstraction layer.\n\n1. Define `ProviderAdapter` interface in `_shared/providers/adapter.ts` with these methods:\n   - `checkAvailability(gpuCount: number, gpuType?: string): Promise<{ available: boolean; headroom: number }>`\n   - `submitJob(job: QueuedJob, payload: unknown): Promise<{ ok: true; provider_job_id: string } | { ok: false; kind: 'quota' | 'client_error'; status?: number; body?: string }>`\n   - `getJobStatus(kind: string, provider_job_id: string): Promise<UnifiedJobStatus>`\n   - `cancelJob(kind: string, provider_job_id: string): Promise<void>`\n   - `listActiveJobs(): Promise<Array<{ kind: string; provider_job_id: string; gpu_count: number }>>`\n\n2. Define `UnifiedJobStatus` with state: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' and optional error/details.\n\n3. Create `FireworksAdapter` in `_shared/providers/fireworks-adapter.ts` that wraps the existing `FireworksClient`.\n   - Map Fireworks protobuf states to UnifiedJobStatus states\n   - `checkAvailability` uses `getTrainingGpuQuota` + `listActiveJobsAllKinds`\n   - `submitJob` calls `createJob`\n   - `getJobStatus` calls `getJob` and normalizes state\n   - `cancelJob` handles SFT/DPO DELETE vs RFT POST :cancel\n   - `listActiveJobs` calls `listActiveJobsAllKinds`\n\n4. Create a `ProviderRegistry` / factory that returns the FireworksAdapter when `provider === 'fireworks'`.\n\n5. Refactor `scheduler-tick/index.ts` to use the adapter instead of direct FireworksClient calls. The adapter instance is resolved from a factory function.\n\n6. Refactor `jobs-api/index.ts` cancel path to use the adapter.\n\n7. Keep `fireworks.ts` as-is but add a deprecation comment — re-export from adapter for backward compat during migration.\n\n8. Update `admission.ts` `SubmitFn` to accept a `ProviderAdapter` instead of being a closure.\n\nDo NOT add Prime Intellect code yet. Do NOT change DB schema. Do NOT change the API request/response shapes."
+    },
+    {
+      "id": "m2",
+      "title": "DB Schema Migration — Add Provider Columns",
+      "description": "Add provider tracking columns to the jobs table so the scheduler can record which provider admitted a job and what its provider-specific ID is. Rename fireworks_payload to provider_payload (or add a parallel column) to store the provider-agnostic request. Add a model resolution table for base_model → provider-specific IDs.",
+      "files_changed": [
+        "supabase/migrations/0004_provider_agnostic_schema.sql",
+        "supabase/functions/_shared/db.ts",
+        "supabase/functions/scheduler-tick/index.ts",
+        "supabase/functions/jobs-api/index.ts",
+        "supabase/functions/jobs-api/validate.ts"
+      ],
+      "tests": [
+        "tests/db-schema.test.js",
+        "tests/jobs-api.provider-payload.test.js"
+      ],
+      "acceptance_criteria": [
+        "Migration 0004 adds `provider` (text, nullable) and `provider_job_id` (text, nullable) to jobs table",
+        "Migration adds `provider_payload` (jsonb, nullable) column; existing `fireworks_payload` kept for backward compat",
+        "Migration adds `model_resolutions` table: base_model (text PK), fireworks_model_id (text), pi_model_id (text), updated_at",
+        "Migration updates jobs.kind check if needed (no change expected)",
+        "scheduler-tick writes provider='fireworks' and provider_job_id on admission",
+        "jobs-api reads provider_payload for new jobs, falls back to fireworks_payload for old jobs",
+        "validate.ts accepts both fireworks_payload and provider_payload (provider_payload preferred)",
+        "All existing tests pass after schema migration"
+      ],
+      "coding_worker_prompt": "Write a DB schema migration and update the code to use it.\n\n1. Create `supabase/migrations/0004_provider_agnostic_schema.sql` with:\n   - `ALTER TABLE jobs ADD COLUMN provider text;`\n   - `ALTER TABLE jobs ADD COLUMN provider_job_id text;`\n   - `ALTER TABLE jobs ADD COLUMN provider_payload jsonb;`\n   - Keep `fireworks_payload` and `fireworks_job_name` for backward compatibility during transition.\n   - Add `model_resolutions` table with columns: `base_model text primary key`, `fireworks_model_id text`, `primeintellect_model_id text`, `updated_at timestamptz default now()`.\n   - Add index on `jobs(provider, state)` for provider-specific filtering.\n\n2. Update `jobs-api/validate.ts` to accept `provider_payload` as an alternative to `fireworks_payload`. If both present, prefer `provider_payload`. If only `fireworks_payload` present, accept it and store it in both columns (or set provider='fireworks' implicitly).\n\n3. Update `jobs-api/index.ts` `handleCreate` to store `provider_payload` alongside `fireworks_payload`.\n\n4. Update `scheduler-tick/index.ts` admission to write `provider = 'fireworks'` and `provider_job_id = <fireworks job name>` when admitting.\n\n5. Update `scheduler-tick/index.ts` reconciliation to read `provider_job_id` instead of `fireworks_job_name` (with fallback).\n\n6. Update `jobs-api/index.ts` cancel to read `provider_job_id` (with fallback to `fireworks_job_name`).\n\n7. Write tests that verify the schema migration applies cleanly and that the API stores/reads the new columns correctly.\n\nDo NOT remove old columns. Do NOT add Prime Intellect code."
+    },
+    {
+      "id": "m3",
+      "title": "Prime Intellect Adapter Implementation",
+      "description": "Implement the PrimeIntellectAdapter that satisfies the ProviderAdapter interface. This adapter handles GPU availability checks via the Prime Intellect API, pod provisioning for job execution, and status polling. It only supports RFT-style jobs initially (Prime Intellect's native hosted training), with SFT/DPO deferred to Phase 2.",
+      "files_changed": [
+        "supabase/functions/_shared/providers/primeintellect-adapter.ts",
+        "supabase/functions/_shared/providers/primeintellect-client.ts",
+        "supabase/functions/_shared/providers/adapter.ts (add PI types)",
+        "supabase/functions/_shared/providers/index.ts (registry update)"
+      ],
+      "tests": [
+        "tests/providers/primeintellect-adapter.test.js",
+        "tests/providers/primeintellect-client.test.js"
+      ],
+      "acceptance_criteria": [
+        "PrimeIntellectAdapter implements ProviderAdapter interface",
+        "checkAvailability calls Prime Intellect GPU availability API and returns available=true if matching offer exists with stockStatus='Available'",
+        "submitJob provisions a pod via POST /api/v1/pods/ with gpuType, gpuCount, image, and generated TOML config for hosted training",
+        "submitJob converts provider-agnostic hyperparameters (learning_rate, max_steps, batch_size, lora_alpha) to TOML config",
+        "getJobStatus polls pod status and maps to UnifiedJobStatus (provisioning→QUEUED, running→RUNNING, stopped→COMPLETED/FAILED)",
+        "cancelJob stops/deletes the pod",
+        "listActiveJobs returns active pods with gpu_count",
+        "All Prime Intellect API calls use PI_API_KEY env var and Authorization: Bearer header",
+        "Unit tests mock Prime Intellect API responses and verify all methods"
+      ],
+      "coding_worker_prompt": "Implement the Prime Intellect provider adapter.\n\n1. Create `supabase/functions/_shared/providers/primeintellect-client.ts` — a low-level HTTP client for Prime Intellect API similar to `fireworks.ts`.\n   - Base URL: `https://api.primeintellect.ai`\n   - Auth: `Authorization: Bearer <PI_API_KEY>`\n   - Methods:\n     * `checkGpuAvailability(gpuType: string, gpuCount: number): Promise<Array<{cloudId, provider, dataCenter, gpuCount, stockStatus, prices}>>`\n     * `createPod(config: PodRequestConfig): Promise<{podId, status}>`\n     * `getPod(podId: string): Promise<{status, gpuCount}>`\n     * `listPods(): Promise<Array<{podId, status, gpuCount}>>`\n     * `deletePod(podId: string): Promise<void>`\n     * `getTrainingRunUsage(runId: string): Promise<unknown>` (for future cost tracking)\n\n2. Create `supabase/functions/_shared/providers/primeintellect-adapter.ts` implementing `ProviderAdapter`.\n   - `checkAvailability(gpuCount, gpuType='H100_80GB')`: call availability API, return `{available: true, headroom: gpuCount}` if any offer has `stockStatus === 'Available'` and `gpuCount >= requested`.\n   - `submitJob(job, payload)`: \n     * Extract base_model from payload, look up `primeintellect_model_id` from `model_resolutions` table (or use a default mapping for MVP).\n     * Build TOML config from hyperparameters: `learning_rate` → `learning_rate`, `max_steps` → `max_steps`, `batch_size` → `batch_size`, `lora_alpha` → `lora_alpha`.\n     * Call `createPod` with `gpuType`, `gpuCount`, `image` (use a default training image), and environment config.\n     * Return `{ok: true, provider_job_id: podId}`.\n   - `getJobStatus(kind, provider_job_id)`: call `getPod`, map states: `provisioning` → `QUEUED`, `running` → `RUNNING`, `stopped` → terminal (need heuristic: if stopped recently and no error → COMPLETED, else FAILED). For MVP, map `stopped` → `FAILED` to be safe.\n   - `cancelJob(kind, provider_job_id)`: call `deletePod`.\n   - `listActiveJobs()`: call `listPods`, filter non-terminal pods, return mapped entries with `gpu_count`.\n\n3. Update `ProviderRegistry` to return `PrimeIntellectAdapter` when `provider === 'primeintellect'`.\n\n4. Add env var `PRIMEINTELLECT_API_KEY` to scheduler-tick and jobs-api (read at startup, error if missing when PI provider selected).\n\n5. Write comprehensive unit tests with mocked fetch for all Prime Intellect client and adapter methods.\n\nNOTE: Prime Intellect's hosted training uses TOML configs. For this milestone, assume the payload contains a `hyperparameters` object and a `base_model` string. The adapter builds the TOML. Dataset handling is an open question — note it in code comments.\n\nDo NOT wire the adapter into the scheduler yet. Do NOT change admission logic."
+    },
+    {
+      "id": "m4",
+      "title": "Provider Selection Strategy in Scheduler",
+      "description": "Extend the scheduler's admission logic to try multiple providers. Implement a configurable provider selection strategy (Fireworks-first with Prime Intellect fallback). Update the GPU budgeting to aggregate across all providers. This is the core integration milestone.",
+      "files_changed": [
+        "supabase/functions/scheduler-tick/admission.ts",
+        "supabase/functions/scheduler-tick/index.ts",
+        "supabase/functions/_shared/providers/adapter.ts",
+        "supabase/functions/_shared/providers/index.ts (registry + strategy)"
+      ],
+      "tests": [
+        "tests/admission.multi-provider.test.js",
+        "tests/scheduler-tick.provider-selection.test.js"
+      ],
+      "acceptance_criteria": [
+        "Admission loop tries Fireworks first, then falls back to Prime Intellect if Fireworks quota exhausted",
+        "Provider selection strategy is configurable via env var (e.g., PROVIDER_STRATEGY=fireworks-first|primeintellect-first|cheapest)",
+        "GPU budgeting aggregates available GPUs across all providers (Fireworks quota + PI availability)",
+        "When a job is admitted via Prime Intellect, provider='primeintellect' and provider_job_id=podId are written to DB",
+        "When a job is admitted via Fireworks, provider='fireworks' and provider_job_id=fireworks_job_name are written to DB",
+        "Per-user cap (≤1 PROGRESS job) still works across all providers",
+        "FIFO ordering is preserved regardless of provider",
+        "Quota error on Fireworks does not block admission of later jobs if Prime Intellect has capacity",
+        "All admission unit tests pass, including new multi-provider scenarios"
+      ],
+      "coding_worker_prompt": "Integrate multi-provider selection into the scheduler admission loop.\n\n1. Update `admission.ts`:\n   - Change `SubmitFn` to accept a `ProviderAdapter` instance, not just a closure.\n   - Or better: change `runAdmission` to accept an array of `{provider: string, adapter: ProviderAdapter, available: number}` and try each provider in order for each job.\n   - The admission loop should:\n     a. For each eligible job (FIFO, user not active), try providers in strategy order.\n     b. For each provider, check `adapter.checkAvailability(job.gpu_count)`.\n     c. If available, call `adapter.submitJob(job, payload)`.\n     d. If submit succeeds, record the provider and provider_job_id, deduct from that provider's budget, mark user active, continue to next job.\n     e. If submit fails with quota, try next provider.\n     f. If all providers exhausted, stop admission (same as current 'stop_insufficient_gpu' behavior).\n   - Keep the same outcome types but add `provider` field to 'admit' outcome.\n\n2. Update `scheduler-tick/index.ts`:\n   - Initialize both `FireworksAdapter` and `PrimeIntellectAdapter` at startup (if API keys available).\n   - Build the provider array with live availability for each.\n   - Pass the array to `runAdmission`.\n   - On admission, write `provider` and `provider_job_id` to DB.\n   - On reconciliation, read `provider` from DB and dispatch to the correct adapter for status polling.\n\n3. Add `PROVIDER_STRATEGY` env var parsing. Default: `fireworks-first`. Supported: `fireworks-first`, `primeintellect-first`, `round-robin`. For MVP, implement `fireworks-first` only; add stubs for others.\n\n4. Update the reconciliation loop in `scheduler-tick/index.ts` to be provider-aware:\n   - For each PROGRESS job, read its `provider` column.\n   - Use the corresponding adapter's `getJobStatus`.\n   - Normalize the status and update DB state.\n\n5. Write unit tests for multi-provider admission:\n   - Fireworks has quota → admit via Fireworks.\n   - Fireworks exhausted, PI available → admit via PI.\n   - Both exhausted → stop.\n   - FIFO preserved across providers.\n   - Per-user cap works across providers.\n\n6. Write integration-style tests for scheduler-tick with mocked adapters.\n\nDo NOT change the jobs-api yet. Do NOT add end-to-end tests."
+    },
+    {
+      "id": "m5",
+      "title": "API Updates for Provider-Agnostic Enqueue & Cancel",
+      "description": "Update the jobs-api to support provider-agnostic job creation and cancellation. Users can optionally specify a preferred provider. The API validates provider_payload and resolves base_model to provider-specific IDs. Cancel works regardless of which provider is running the job.",
+      "files_changed": [
+        "supabase/functions/jobs-api/index.ts",
+        "supabase/functions/jobs-api/validate.ts",
+        "supabase/functions/_shared/providers/adapter.ts",
+        "supabase/functions/_shared/providers/index.ts"
+      ],
+      "tests": [
+        "tests/jobs-api.provider-agnostic.test.js",
+        "tests/jobs-api.cancel.test.js"
+      ],
+      "acceptance_criteria": [
+        "POST /jobs accepts `provider_payload` with `base_model`, `hyperparameters`, `dataset` fields",
+        "POST /jobs accepts optional `preferred_provider` field ('fireworks' | 'primeintellect' | null)",
+        "POST /jobs validates that base_model exists in model_resolutions table (or is a known default)",
+        "POST /jobs stores provider_payload and leaves provider=null (scheduler decides on admission)",
+        "GET /jobs returns provider and provider_job_id in responses",
+        "DELETE /jobs/:id reads provider from DB and dispatches cancel to the correct adapter",
+        "Cancel on Prime Intellect calls deletePod; cancel on Fireworks uses existing logic",
+        "Cancel returns appropriate error if provider_job_id is missing",
+        "All existing API tests pass; new tests cover provider-agnostic enqueue and cancel"
+      ],
+      "coding_worker_prompt": "Update the jobs-api for full provider agnosticism.\n\n1. Update `validate.ts`:\n   - Accept `provider_payload` as the primary payload field. Structure:\n     ```json\n     {\n       'base_model': 'llama-3.1-8b',  // lookup key in model_resolutions\n       'dataset': 'my-dataset',\n       'hyperparameters': {\n         'learning_rate': 1e-5,\n         'epochs': 3,\n         'batch_size': 64,\n         'max_steps': 100,\n         'lora_alpha': 16\n       }\n     }\n     ```\n   - Accept optional `preferred_provider: 'fireworks' | 'primeintellect'`\n   - Validate `base_model` is a string and non-empty.\n   - Validate `hyperparameters` is an object if present.\n   - Keep backward compatibility: if `provider_payload` is missing but `fireworks_payload` is present, accept it and set `preferred_provider='fireworks'` implicitly.\n\n2. Update `jobs-api/index.ts` `handleCreate`:\n   - Store `provider_payload` in DB.\n   - Store `preferred_provider` if provided.\n   - Do NOT resolve model IDs at enqueue time — the scheduler does that at admission.\n\n3. Update `jobs-api/index.ts` `handleCancel`:\n   - Read `provider` and `provider_job_id` from DB.\n   - If `provider` is null (job not yet admitted), just mark CANCELLED in DB.\n   - If `provider === 'fireworks'`, use FireworksAdapter.cancelJob.\n   - If `provider === 'primeintellect'`, use PrimeIntellectAdapter.cancelJob.\n   - If provider is unknown, return 500.\n   - Remove the hardcoded `FIREWORKS_API_KEY` check from cancel — use the adapter registry instead.\n\n4. Update `jobs-api/index.ts` `handleGetOne` and `handleList` to include `provider` and `provider_job_id` in responses.\n\n5. Write tests:\n   - Provider-agnostic enqueue with provider_payload.\n   - Backward-compatible enqueue with fireworks_payload.\n   - Cancel for each provider (mocked adapters).\n   - Cancel for not-yet-admitted job.\n   - List/get include provider fields.\n\nDo NOT change the scheduler admission logic — that was m4. Do NOT add end-to-end tests."
+    },
+    {
+      "id": "m6",
+      "title": "Model Resolution & Hyperparameter Mapping",
+      "description": "Implement the model resolution layer that maps user-friendly base_model names to provider-specific model IDs. Add hyperparameter normalization so the same provider_payload works across Fireworks and Prime Intellect despite their different config formats.",
+      "files_changed": [
+        "supabase/functions/_shared/model-resolution.ts",
+        "supabase/functions/_shared/hyperparameters.ts",
+        "supabase/functions/_shared/providers/fireworks-adapter.ts",
+        "supabase/functions/_shared/providers/primeintellect-adapter.ts",
+        "supabase/migrations/0005_seed_model_resolutions.sql"
+      ],
+      "tests": [
+        "tests/model-resolution.test.js",
+        "tests/hyperparameters.test.js"
+      ],
+      "acceptance_criteria": [
+        "Model resolution service maps base_model 'llama-3.1-8b' → fireworks 'accounts/fireworks/models/llama-v3p1-8b-instruct' and pi 'meta-llama/Llama-3.2-1B-Instruct' (or correct IDs)",
+        "Hyperparameter normalization converts epochs + dataset size → max_steps for Prime Intellect",
+        "Fireworks adapter builds the correct JSON payload from provider_payload + resolved model ID",
+        "Prime Intellect adapter builds the correct TOML config from provider_payload + resolved model ID",
+        "Seed migration populates model_resolutions table with known mappings",
+        "Unknown base_model returns validation error at enqueue time",
+        "Unit tests cover all mappings and conversions"
+      ],
+      "coding_worker_prompt": "Build the model resolution and hyperparameter mapping layer.\n\n1. Create `supabase/functions/_shared/model-resolution.ts`:\n   - `resolveModel(baseModel: string, provider: 'fireworks' | 'primeintellect'): Promise<string>`\n   - Queries `model_resolutions` table for the base_model, returns the provider-specific ID.\n   - Throws `ModelNotFoundError` if base_model is unknown.\n   - Cache results in-memory for the tick (table is small).\n\n2. Create `supabase/functions/_shared/hyperparameters.ts`:\n   - `normalizeForFireworks(params: Hyperparameters): FireworksTrainingConfig`\n     * Maps `learning_rate` → `trainingConfig.learningRate`\n     * Maps `epochs` → `trainingConfig.epochs`\n     * Maps `batch_size` → `trainingConfig.batchSize`\n     * Adds resolved `model` field\n     * Adds `dataset` field\n   - `normalizeForPrimeIntellect(params: Hyperparameters, datasetSize?: number): string` (returns TOML)\n     * Maps `learning_rate` → `learning_rate`\n     * Maps `batch_size` → `batch_size`\n     * Maps `lora_alpha` → `lora_alpha`\n     * If `max_steps` provided, use it. If `epochs` and `datasetSize` provided, compute `max_steps = epochs * datasetSize / batch_size`.\n     * Adds resolved `model` field\n     * Returns TOML string.\n   - `Hyperparameters` interface: `{ learning_rate?: number; epochs?: number; batch_size?: number; max_steps?: number; lora_alpha?: number; }`\n\n3. Update `FireworksAdapter.submitJob` to use `resolveModel` and `normalizeForFireworks` to build the payload from `provider_payload`.\n\n4. Update `PrimeIntellectAdapter.submitJob` to use `resolveModel` and `normalizeForPrimeIntellect` to build the TOML config.\n\n5. Create `supabase/migrations/0005_seed_model_resolutions.sql` with initial mappings:\n   ```sql\n   INSERT INTO model_resolutions (base_model, fireworks_model_id, primeintellect_model_id) VALUES\n   ('llama-3.1-8b', 'accounts/fireworks/models/llama-v3p1-8b-instruct', 'meta-llama/Llama-3.2-1B-Instruct'),\n   ('llama-3.1-70b', 'accounts/fireworks/models/llama-v3p1-70b-instruct', 'meta-llama/Llama-3.1-70B-Instruct'),\n   ('qwen-3.5-35b', 'accounts/fireworks/models/qwen3p5-35b-a3b', 'Qwen/Qwen3.5-35B-A3B');\n   ```\n   (Verify actual Prime Intellect model IDs against their docs before finalizing.)\n\n6. Update `jobs-api/validate.ts` to check that `base_model` exists in `model_resolutions` at enqueue time (query DB or use a cached list).\n\n7. Write unit tests for all normalization functions and model resolution.\n\nDo NOT change scheduler admission logic. Do NOT change API response shapes."
+    },
+    {
+      "id": "m7",
+      "title": "End-to-End Integration Tests & Documentation",
+      "description": "Write comprehensive end-to-end tests that exercise the full provider-agnostic flow: enqueue via API, admission by scheduler with provider selection, status reconciliation, and cancellation. Update documentation. Mark the feature as complete.",
+      "files_changed": [
+        "tests/e2e/provider-agnostic.test.js",
+        "tests/e2e/fireworks-only.test.js",
+        "tests/e2e/primeintellect-fallback.test.js",
+        "README.md (provider-agnostic section)",
+        "supabase/functions/_shared/providers/README.md"
+      ],
+      "tests": [
+        "tests/e2e/provider-agnostic.test.js",
+        "tests/e2e/fireworks-only.test.js",
+        "tests/e2e/primeintellect-fallback.test.js"
+      ],
+      "acceptance_criteria": [
+        "E2E test: enqueue SFT job → scheduler admits via Fireworks → reconcile to SUCCESS → verify DB state",
+        "E2E test: enqueue RFT job with Fireworks quota exhausted → scheduler admits via Prime Intellect → reconcile to terminal → verify DB has provider='primeintellect'",
+        "E2E test: cancel in-progress Fireworks job → verify Fireworks cancel called + DB state CANCELLED",
+        "E2E test: cancel in-progress Prime Intellect job → verify pod delete called + DB state CANCELLED",
+        "E2E test: per-user cap enforced across providers (user has Fireworks job in PROGRESS, second job cannot admit to PI either)",
+        "E2E test: FIFO preserved when provider fallback occurs",
+        "All unit tests from m1-m6 still pass",
+        "README documents provider-agnostic architecture, supported providers, and configuration",
+        "Provider adapter README documents how to add a new provider",
+        "No regressions in existing Fireworks-only behavior"
+      ],
+      "coding_worker_prompt": "Write end-to-end integration tests and documentation.\n\n1. Create `tests/e2e/provider-agnostic.test.js` — a full E2E test using mocked adapters and an in-memory or test Supabase instance (or mock DB client if Supabase is not available in test env).\n   - Test the complete lifecycle: POST /jobs → scheduler tick → status reconciliation → DELETE /jobs.\n   - Mock both FireworksAdapter and PrimeIntellectAdapter.\n   - Mock the DB client or use a test Supabase project.\n   - Verify all DB state transitions and provider fields.\n\n2. Create `tests/e2e/fireworks-only.test.js` — verify existing Fireworks-only behavior still works (regression test).\n\n3. Create `tests/e2e/primeintellect-fallback.test.js` — specifically test the fallback scenario where Fireworks is exhausted and Prime Intellect picks up the job.\n\n4. Update `README.md` with:\n   - Architecture overview: ProviderAdapter interface, registry, selection strategy.\n   - Supported providers: Fireworks (SFT/DPO/RFT), Prime Intellect (RFT initially).\n   - Configuration: env vars (FIREWORKS_API_KEY, PRIMEINTELLECT_API_KEY, PROVIDER_STRATEGY).\n   - Model resolution: how base_model maps to provider IDs.\n   - Adding a new provider: implement ProviderAdapter, register in registry, add model mappings.\n\n5. Create `supabase/functions/_shared/providers/README.md` with adapter development guide.\n\n6. Run all tests (unit + e2e) and ensure 100% pass.\n\n7. Do a final review for any hardcoded Fireworks references that should be provider-agnostic.\n\nThis is the final milestone — no new features, only tests and docs."
+    }
+  ],
+  "dependencies": {
+    "m2": ["m1"],
+    "m3": ["m1"],
+    "m4": ["m2", "m3"],
+    "m5": ["m4"],
+    "m6": ["m3", "m5"],
+    "m7": ["m1", "m2", "m3", "m4", "m5", "m6"]
+  },
+  "open_questions": [
+    "Does Prime Intellect support SFT and DPO natively, or only RFT-style training? If only RFT, SFT/DPO on PI may require custom training scripts inside pods — defer to Phase 2.",
+    "How are datasets uploaded to Prime Intellect? Fireworks uses pre-uploaded datasets by name; Prime Intellect may require dataset upload to pod or use of their dataset hub. Need to verify API.",
+    "What are the exact Prime Intellect model IDs for popular models (Llama, Qwen, etc.)? The research used examples from docs but they may not be exact.",
+    "What is the correct Prime Intellect training image/docker image for hosted training? Need to verify with their API/docs.",
+    "How does Prime Intellect pod billing work — is it per-hour GPU rental or per-token? The research mentions both. This affects cost-based provider selection (future feature).",
+    "Should provider_payload include a `kind` field (SFT/DPO/RFT) or is that still stored at the jobs table level? Current design keeps `kind` on the jobs table.",
+    "Should the scheduler support multiple active jobs per user (relax the ≤1 PROGRESS constraint) when providers are different? Recommendation: keep the constraint — it's a user-level cap, not provider-level.",
+    "What happens when a Prime Intellect pod fails during provisioning (e.g., out of stock after availability check)? Need retry/backoff logic — possibly a new milestone.",
+    "Do we need a migration to backfill provider='fireworks' for existing in-progress jobs during deployment? Yes — add a one-time migration or handle in code with fallback reads."
+  ]
+}
