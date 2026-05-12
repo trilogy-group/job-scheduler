@@ -158,7 +158,12 @@ Deno.serve(async (req: Request) => {
               body: e.body,
             };
           }
-          throw e;
+          return {
+            ok: false as const,
+            kind: "client_error" as const,
+            status: 500,
+            body: e instanceof Error ? e.message : String(e),
+          };
         }
       },
     );
