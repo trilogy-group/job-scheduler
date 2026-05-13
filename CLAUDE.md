@@ -73,21 +73,23 @@ bd dolt push          # Push beads state to remote
 
 ## Architecture Overview
 
-The job-scheduler is a **Supabase-based fine-tuning job queue** that manages Fireworks AI GPU training jobs (SFT, DPO, RFT) with fair-scheduler admission control.
+The job-scheduler is a **Supabase-based fine-tuning job queue** that supports multiple GPU training providers (Fireworks AI and Prime Intellect) with a unified input schema, provider adapter pattern, and fair-scheduler admission control.
 
 ### Key Components
 
 | Component | Location | Technology | Purpose |
 |-----------|----------|------------|---------|
 | **Edge Functions** | `supabase/functions/` | TypeScript / Deno | Serverless API endpoints |
-| `scheduler-tick` | `scheduler-tick/index.ts` | Deno + pg_cron | 30s cron job: reconcile jobs, admit queued jobs |
-| `jobs-api` | `jobs-api/index.ts` | Deno | REST API: submit jobs, list status, cancel |
-| `admission.ts` | `scheduler-tick/admission.ts` | Deno | FIFO admission with per-user limits |
-| **Shared modules** | `supabase/functions/_shared/` | TypeScript | Auth, DB client, Fireworks client, response helpers |
-| **Fireworks client** | `_shared/fireworks.ts` | TypeScript | SFT/DPO/RFT job submission, quota checking, GPU counting |
+| `scheduler-tick` | `scheduler-tick/index.ts` | Deno + pg_cron | 30s cron job: reconcile jobs, admit queued jobs per provider |
+| `jobs-api` | `jobs-api/index.ts` | Deno | REST API: submit jobs (unified schema or legacy), list status, cancel |
+| `admission.ts` | `scheduler-tick/admission.ts` | Deno | FIFO admission with per-user limits per provider |
+| **Shared modules** | `supabase/functions/_shared/` | TypeScript | Auth, DB client, provider adapters, response helpers |
+| **Provider interface** | `_shared/providers.ts` | TypeScript | `ProviderClient` interface: `submitJob`, `getJobStatus`, `listActiveJobs`, `cancelJob`, `getComputeCapacity` |
+| **Fireworks adapter** | `_shared/fireworks-provider.ts` | TypeScript | SFT/DPO/RFT via Fireworks REST API, quota checking, GPU counting |
+| **Prime Intellect adapter** | `_shared/primeintellect-provider.ts` | TypeScript | RFT via Prime Intellect Hosted Training REST API |
 | **Database** | Supabase PostgreSQL | SQL | Jobs table, api_keys table, scheduler config |
 | **Scripts** | `scripts/` | Node.js | `seed_users.js`, `issue_key.js`, `revoke_key.js`, `dump_state.js` |
-| **Tests** | `tests/*.test.js` | Node.js --test | API and scheduler tests |
+| **Tests** | `tests/*.test.js` | Node.js --test | API, scheduler, and provider adapter tests |
 
 ### Data Flow
 
@@ -100,19 +102,18 @@ jobs-api (Edge Function) ──► Supabase DB (jobs table, state=QUEUED)
     │                           ▼
     │◄────────────────── scheduler-tick (30s pg_cron)
     │    Reconcile PROGRESS → update terminal states
-    │    Discover GPU headroom → admit queued jobs
-    │    Update DB state, fireworks_job_name
+    │    Discover per-provider GPU headroom → admit queued jobs
+    │    Update DB state, provider_job_id
     │
     ▼
-Fireworks API
-    GET/POST /supervisedFineTuningJobs
-    GET/POST /dpoJobs
-    GET/POST /reinforcementFineTuningJobs
+Provider Adapters
+    ├── Fireworks API  (SFT / DPO / RFT)
+    └── Prime Intellect API  (RFT only)
 ```
 
 ### Key Database Tables
 
-- `jobs` — id, user_id, kind (SFT/DPO/RFT), state (QUEUED/PROGRESS/SUCCESS/FAIL/CANCELLED), gpu_count, fireworks_job_name, created_at, started_at, completed_at
+- `jobs` — id, user_id, kind (SFT/DPO/RFT), state (QUEUED/PROGRESS/SUCCESS/FAIL/CANCELLED), gpu_count, **provider** (fireworks / primeintellect), **provider_payload** (jsonb), **provider_job_id** (text), display_name, error, created_at, started_at, completed_at
 - `api_keys` — id, user_id, key_hash, created_at, revoked_at, last_used_at
 
 ---
@@ -189,6 +190,7 @@ SCHEDULER_SECRET=<random_secret_for_scheduler_tick>
 ### Error Handling
 
 - Fireworks API errors wrap in `FireworksError` with `{ status, body, isQuotaError }`.
+- Prime Intellect API errors wrap in `PrimeIntellectError` with `{ status, body }`.
 - Quota exhaustion (429 with `in use: X, quota: Y` pattern) is non-terminal — job stays QUEUED, tick skips admission.
 - 404 on `getJob` during reconciliation means external cancellation → mark as CANCELLED.
 
@@ -204,6 +206,7 @@ QUEUED ──► PROGRESS ──► SUCCESS
 
 - Terminal states: SUCCESS, FAIL, CANCELLED
 - Fireworks terminal: JOB_STATE_COMPLETED, JOB_STATE_FAILED, JOB_STATE_CANCELLED, JOB_STATE_EXPIRED, JOB_STATE_EARLY_STOPPED
+- Prime Intellect terminal: COMPLETED → SUCCESS, FAILED / ERROR → FAIL, STOPPED / CANCELLED → CANCELLED
 
 ### Testing
 

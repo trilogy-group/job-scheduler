@@ -11,6 +11,7 @@ import { authenticate } from "../_shared/auth.ts";
 import { json, error } from "../_shared/response.ts";
 import { FireworksProvider } from "../_shared/fireworks-provider.ts";
 import { isFireworksError } from "../_shared/fireworks-provider.ts";
+import { PrimeIntellectProvider } from "../_shared/primeintellect-provider.ts";
 import type { Kind } from "../_shared/providers.ts";
 import { validateEnqueue, TERMINAL_STATES } from "./validate.ts";
 import type { UnifiedJobInput } from "./validate.ts";
@@ -177,6 +178,18 @@ async function handleCancel(id: string, db, userId: string): Promise<Response> {
     } catch (e) {
       if (isFireworksError(e)) {
         return error(502, "Fireworks cancel failed", { status: e.status, detail: e.body });
+      }
+      throw e;
+    }
+  } else if (job.provider === "primeintellect") {
+    const apiKey = Deno.env.get("PRIME_API_KEY");
+    if (!apiKey) return error(500, "PRIME_API_KEY missing");
+    const pi = new PrimeIntellectProvider(apiKey);
+    try {
+      await pi.cancelJob(job.kind as Kind, job.provider_job_id);
+    } catch (e) {
+      if (e instanceof Error) {
+        return error(502, "Prime Intellect cancel failed", { detail: e.message });
       }
       throw e;
     }

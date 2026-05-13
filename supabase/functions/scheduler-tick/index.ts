@@ -9,6 +9,11 @@ import {
 } from "../_shared/fireworks-provider.ts";
 import { FireworksProvider } from "../_shared/fireworks-provider.ts";
 import { mapFireworksTerminal } from "../_shared/fireworks-provider.ts";
+import {
+  isPrimeIntellectError,
+  mapPrimeIntellectTerminal,
+  PrimeIntellectProvider,
+} from "../_shared/primeintellect-provider.ts";
 import type { Kind } from "../_shared/providers.ts";
 import { runAdmission, QueuedJob } from "./admission.ts";
 import type { AdmissionStep } from "./admission.ts";
@@ -39,9 +44,13 @@ Deno.serve(async (req: Request) => {
 
     // --- Build provider clients -----------------------------------------
     const fireworksKey = Deno.env.get("FIREWORKS_API_KEY");
-    const providers: Record<string, FireworksProvider> = {};
+    const primeKey = Deno.env.get("PRIME_API_KEY");
+    const providers: Record<string, FireworksProvider | PrimeIntellectProvider> = {};
     if (fireworksKey) {
       providers["fireworks"] = new FireworksProvider(fireworksKey);
+    }
+    if (primeKey) {
+      providers["primeintellect"] = new PrimeIntellectProvider(primeKey);
     }
 
     // --- Reconcile PROGRESS jobs against providers ----------------------
@@ -163,12 +172,14 @@ Deno.serve(async (req: Request) => {
             if (isFireworksError(e) && e.isQuotaError) {
               return { ok: false as const, kind: "quota" as const };
             }
-            if (isFireworksError(e)) {
+            if (isFireworksError(e) || isPrimeIntellectError(e)) {
+              const status = isFireworksError(e) ? e.status : e.status;
+              const body = isFireworksError(e) ? e.body : e.body;
               return {
                 ok: false as const,
                 kind: "client_error" as const,
-                status: e.status,
-                body: e.body,
+                status,
+                body,
               };
             }
             return {
@@ -247,6 +258,23 @@ function mapProviderTerminal(
 ): { state: "SUCCESS" | "FAIL" | "CANCELLED"; errorText: (job: { error?: unknown; message?: unknown }) => string | null } | null {
   if (provider === "fireworks") {
     const mapping = mapFireworksTerminal(state);
+    if (mapping.state === "SUCCESS") {
+      return { state: "SUCCESS", errorText: () => null };
+    }
+    if (mapping.state === "CANCELLED") {
+      return { state: "CANCELLED", errorText: () => null };
+    }
+    return {
+      state: "FAIL",
+      errorText: (job) =>
+        (typeof job.error === "string" && job.error) ||
+        (typeof job.message === "string" && job.message) ||
+        null,
+    };
+  }
+  if (provider === "primeintellect") {
+    const mapping = mapPrimeIntellectTerminal(state);
+    if (!mapping) return null;
     if (mapping.state === "SUCCESS") {
       return { state: "SUCCESS", errorText: () => null };
     }
