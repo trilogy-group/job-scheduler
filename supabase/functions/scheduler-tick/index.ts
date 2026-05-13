@@ -102,22 +102,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // --- Discover per-provider GPU headroom -----------------------------
-    const providerCapacity: Record<string, number> = {};
-    for (const [name, provider] of Object.entries(providers)) {
-      try {
-        const cap = await provider.getComputeCapacity();
-        const available = Math.max(0, cap.totalGpus - cap.usedGpus);
-        providerCapacity[name] = available;
-        summary.by_provider[name] = { available, admitted: 0 };
-      } catch (e) {
-        console.warn("getComputeCapacity failed for", name, e);
-        providerCapacity[name] = 0;
-        summary.by_provider[name] = { available: 0, admitted: 0 };
-      }
-    }
-
-    // --- Admit queued jobs per provider ---------------------------------
+    // --- Fetch queued + active jobs for admission -----------------------
     const [{ data: queuedRows, error: queuedErr }, { data: activeRows, error: activeErr }] =
       await Promise.all([
         db
@@ -125,7 +110,7 @@ Deno.serve(async (req: Request) => {
           .select("id, user_id, kind, provider, gpu_count, created_at")
           .eq("state", "QUEUED")
           .order("created_at", { ascending: true }),
-        db.from("jobs").select("user_id, provider").eq("state", "PROGRESS"),
+        db.from("jobs").select("user_id, provider, gpu_count").eq("state", "PROGRESS"),
       ]);
     if (queuedErr) throw queuedErr;
     if (activeErr) throw activeErr;
@@ -140,12 +125,38 @@ Deno.serve(async (req: Request) => {
       queuedByProvider[p].push(row as QueuedJob);
     }
 
-    // Track active users per provider
+    // Track active users and DB-ground-truth used GPUs per provider.
+    // We trust our own PROGRESS rows rather than provider.listActiveJobs()
+    // because external/orphaned jobs would overcount and starve the queue.
     const activeUsersByProvider: Record<string, Set<string>> = {};
+    const dbUsedGpusByProvider: Record<string, number> = {};
     for (const row of activeRows ?? []) {
       const p = row.provider ?? "fireworks";
       if (!activeUsersByProvider[p]) activeUsersByProvider[p] = new Set();
       activeUsersByProvider[p].add(row.user_id);
+      dbUsedGpusByProvider[p] = (dbUsedGpusByProvider[p] ?? 0) + (row.gpu_count ?? 4);
+    }
+
+    // --- Discover per-provider GPU headroom -----------------------------
+    const providerCapacity: Record<string, number> = {};
+    for (const [name, provider] of Object.entries(providers)) {
+      try {
+        const cap = await provider.getComputeCapacity();
+        const totalGpus = cap.totalGpus;
+        const dbUsedGpus = dbUsedGpusByProvider[name] ?? 0;
+        const available = Math.max(0, totalGpus - dbUsedGpus);
+        providerCapacity[name] = available;
+        summary.by_provider[name] = { available, admitted: 0 };
+        if (cap.usedGpus !== dbUsedGpus) {
+          console.warn(
+            `capacity drift for ${name}: provider reports used=${cap.usedGpus}, db PROGRESS=${dbUsedGpus}`,
+          );
+        }
+      } catch (e) {
+        console.warn("getComputeCapacity failed for", name, e);
+        providerCapacity[name] = 0;
+        summary.by_provider[name] = { available: 0, admitted: 0 };
+      }
     }
 
     // Run admission for each provider independently
