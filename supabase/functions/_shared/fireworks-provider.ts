@@ -135,12 +135,12 @@ export class FireworksProvider implements ProviderClient {
   }
 
   /**
-   * Fetch live GPU quota + usage.
+   * Fetch live GPU quota ceiling.
    *
-   * Returns {totalGpus, usedGpus} for the training GPU quota.
-   * We trust maxValue (account ceiling) but NOT usage — that counter
-   * has been observed to get stuck. Instead, compute in-use by summing
-   * gpu_count across live non-terminal jobs.
+   * Returns {totalGpus, usedGpus: 0}.  The scheduler tick computes actual
+   * used GPUs from its own DB PROGRESS rows to avoid over-counting external
+   * or orphaned jobs.  Calling listActiveJobs() here was causing Edge
+   * Function timeouts because it fans out to 3 Fireworks endpoints.
    */
   async getComputeCapacity(_kind?: Kind): Promise<ProviderComputeCapacity> {
     const res = await this.request(`${this.base}/quotas`);
@@ -161,23 +161,7 @@ export class FireworksProvider implements ProviderClient {
       );
     }
     const totalGpus = parseInt(match.maxValue ?? match.value ?? "0", 10);
-    const rawUsage = typeof match.usage === "number" ? match.usage : 0;
-
-    // Compute actual usage from live jobs (workaround for stale quota counter)
-    const active = await this.listActiveJobs();
-    const usedGpus = active.reduce(
-      (sum, j) => sum + extractGpuCount(j, 4),
-      0,
-    );
-
-    // Log drift for ops visibility
-    if (rawUsage !== usedGpus) {
-      console.warn(
-        `quota.usage drift: fireworks reports usage=${rawUsage}, computed=${usedGpus} from ${active.length} active jobs`,
-      );
-    }
-
-    return { totalGpus, usedGpus };
+    return { totalGpus, usedGpus: 0 };
   }
 }
 
