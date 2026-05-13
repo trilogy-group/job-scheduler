@@ -3,15 +3,18 @@ import assert from 'node:assert/strict';
 import { validateEnqueue } from '../supabase/functions/jobs-api/validate.ts';
 import { bearerToken, sha256Hex } from '../supabase/functions/_shared/auth.ts';
 
-test('validateEnqueue accepts a minimal SFT body', () => {
+// --- Legacy mode (fireworks_payload) ---
+
+test('validateEnqueue accepts a minimal SFT body (legacy)', () => {
   const r = validateEnqueue({ kind: 'SFT', fireworks_payload: { baseModel: 'x' } });
   assert.equal(r.ok, true);
   assert.equal(r.value.kind, 'SFT');
   assert.equal(r.value.gpu_count, 4);
   assert.equal(r.value.display_name, null);
+  assert.equal(r.value.fireworks_payload.baseModel, 'x');
 });
 
-test('validateEnqueue accepts DPO and preserves display_name + gpu_count', () => {
+test('validateEnqueue accepts DPO and preserves display_name + gpu_count (legacy)', () => {
   const r = validateEnqueue({
     kind: 'DPO',
     display_name: 'test run',
@@ -24,7 +27,7 @@ test('validateEnqueue accepts DPO and preserves display_name + gpu_count', () =>
   assert.equal(r.value.gpu_count, 8);
 });
 
-test('validateEnqueue accepts RFT', () => {
+test('validateEnqueue accepts RFT (legacy)', () => {
   const r = validateEnqueue({
     kind: 'RFT',
     display_name: 'rl run',
@@ -45,13 +48,13 @@ test('validateEnqueue rejects unknown kind', () => {
   assert.match(r.err.message, /kind must be/);
 });
 
-test('validateEnqueue rejects missing payload', () => {
-  const r = validateEnqueue({ kind: 'SFT' });
+test('validateEnqueue rejects non-object fireworks_payload', () => {
+  const r = validateEnqueue({ kind: 'SFT', fireworks_payload: 'bad' });
   assert.equal(r.ok, false);
-  assert.match(r.err.message, /fireworks_payload/);
+  assert.match(r.err.message, /fireworks_payload must be an object/);
 });
 
-test('validateEnqueue rejects non-integer gpu_count', () => {
+test('validateEnqueue rejects non-integer gpu_count (legacy)', () => {
   assert.equal(validateEnqueue({ kind: 'SFT', gpu_count: 0, fireworks_payload: {} }).ok, false);
   assert.equal(validateEnqueue({ kind: 'SFT', gpu_count: -4, fireworks_payload: {} }).ok, false);
   assert.equal(validateEnqueue({ kind: 'SFT', gpu_count: 1.5, fireworks_payload: {} }).ok, false);
@@ -63,11 +66,73 @@ test('validateEnqueue rejects non-string display_name', () => {
   assert.equal(r.ok, false);
 });
 
+// --- Unified schema mode ---
+
+test('validateEnqueue accepts unified schema (minimal)', () => {
+  const r = validateEnqueue({
+    kind: 'SFT',
+    base_model: 'accounts/fireworks/models/llama-v3p1-8b-instruct',
+    dataset: 'https://example.com/dataset.jsonl',
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.value.kind, 'SFT');
+  assert.equal(r.value.base_model, 'accounts/fireworks/models/llama-v3p1-8b-instruct');
+  assert.equal(r.value.dataset, 'https://example.com/dataset.jsonl');
+  assert.equal(r.value.gpu_count, 4);
+  assert.equal(r.value.preferred_provider, 'fireworks');
+  assert.equal(r.value.fireworks_payload, null);
+});
+
+test('validateEnqueue accepts unified schema with all fields', () => {
+  const r = validateEnqueue({
+    kind: 'DPO',
+    base_model: 'accounts/fireworks/models/llama-v3p1-8b-instruct',
+    dataset: 'https://example.com/dataset.jsonl',
+    display_name: 'my dpo run',
+    gpu_count: 8,
+    hyperparameters: { learning_rate: 1e-5, num_epochs: 3 },
+    preferred_provider: 'primeintellect',
+    provider_overrides: { foo: 'bar' },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.value.kind, 'DPO');
+  assert.equal(r.value.display_name, 'my dpo run');
+  assert.equal(r.value.gpu_count, 8);
+  assert.equal(r.value.preferred_provider, 'primeintellect');
+  assert.deepEqual(r.value.hyperparameters, { learning_rate: 1e-5, num_epochs: 3 });
+  assert.deepEqual(r.value.provider_overrides, { foo: 'bar' });
+});
+
+test('validateEnqueue rejects missing base_model in unified mode', () => {
+  const r = validateEnqueue({ kind: 'SFT', dataset: 'x' });
+  assert.equal(r.ok, false);
+  assert.match(r.err.message, /base_model is required/);
+});
+
+test('validateEnqueue rejects missing dataset in unified mode', () => {
+  const r = validateEnqueue({ kind: 'SFT', base_model: 'x' });
+  assert.equal(r.ok, false);
+  assert.match(r.err.message, /dataset is required/);
+});
+
+test('validateEnqueue rejects invalid preferred_provider', () => {
+  const r = validateEnqueue({
+    kind: 'SFT',
+    base_model: 'x',
+    dataset: 'y',
+    preferred_provider: 'aws',
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.err.message, /preferred_provider must be 'fireworks' or 'primeintellect'/);
+});
+
 test('validateEnqueue rejects non-object body', () => {
   assert.equal(validateEnqueue(null).ok, false);
   assert.equal(validateEnqueue('hi').ok, false);
   assert.equal(validateEnqueue(42).ok, false);
 });
+
+// --- Auth helpers ---
 
 test('bearerToken extracts the token', () => {
   const req = new Request('http://x/', { headers: { Authorization: 'Bearer sftq_abc' } });

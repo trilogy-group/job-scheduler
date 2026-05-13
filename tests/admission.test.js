@@ -1,18 +1,18 @@
 // Unit tests for the admission loop.
 //
 // These lock in the spec's FIFO + per-user-cap + GPU-budget semantics
-// without needing Postgres or a live Fireworks instance.
+// without needing Postgres or a live provider.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runAdmission } from '../supabase/functions/scheduler-tick/admission.ts';
 
-function mkJob(id, user, kind = 'SFT', gpu = 4, created_at = `2026-04-20T00:00:0${id}Z`) {
-  return { id, user_id: user, kind, gpu_count: gpu, created_at };
+function mkJob(id, user, kind = 'SFT', gpu = 4, created_at = `2026-04-20T00:00:0${id}Z`, provider = 'fireworks') {
+  return { id, user_id: user, kind, provider, gpu_count: gpu, created_at };
 }
 
 function alwaysOk(namePrefix = 'fw-') {
-  return async (job) => ({ ok: true, fireworks_job_name: namePrefix + job.id });
+  return async (job) => ({ ok: true, provider_job_id: namePrefix + job.id });
 }
 
 test('FIFO: simple queue with budget to spare', async () => {
@@ -20,7 +20,7 @@ test('FIFO: simple queue with budget to spare', async () => {
   const queue = [mkJob(1, 'alice'), mkJob(2, 'bob')];
   const steps = await runAdmission(queue, new Set(), 8, alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), ['admit', 'admit']);
-  assert.equal(steps[0].outcome.fireworks_job_name, 'fw-1');
+  assert.equal(steps[0].outcome.provider_job_id, 'fw-1');
 });
 
 test("per-user cap: praveen's 3 jobs + samkit + anirudh scenario", async () => {
@@ -34,7 +34,7 @@ test("per-user cap: praveen's 3 jobs + samkit + anirudh scenario", async () => {
   //   Tick 3: admit P3         (only job left)
 
   const mkFq = (id, user) => ({
-    id, user_id: user, kind: 'SFT', gpu_count: 4,
+    id, user_id: user, kind: 'SFT', provider: 'fireworks', gpu_count: 4,
     created_at: `2026-04-20T00:00:0${id}Z`,
   });
   const initial = [
@@ -87,7 +87,7 @@ test('quota error stops admission for the rest of the tick', async () => {
   let call = 0;
   const submit = async (job) => {
     call++;
-    if (call === 1) return { ok: true, fireworks_job_name: 'fw-1' };
+    if (call === 1) return { ok: true, provider_job_id: 'fw-1' };
     if (call === 2) return { ok: false, kind: 'quota' };
     throw new Error('should not be called after quota error');
   };
@@ -101,7 +101,7 @@ test('non-quota 4xx marks FAIL and continues', async () => {
   const queue = [mkJob(1, 'alice'), mkJob(2, 'bob')];
   const submit = async (job) => {
     if (job.id === 1) return { ok: false, kind: 'client_error', status: 400, body: 'bad payload' };
-    return { ok: true, fireworks_job_name: 'fw-2' };
+    return { ok: true, provider_job_id: 'fw-2' };
   };
   const steps = await runAdmission(queue, new Set(), 8, submit);
   assert.equal(steps[0].outcome.status, 'submit_failed');

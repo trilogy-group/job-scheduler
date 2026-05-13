@@ -1,15 +1,16 @@
 // Pure admission logic, separated so Node tests can cover the scheduler's
-// decisions without a Postgres instance or a live Fireworks.
+// decisions without a Postgres instance or a live provider.
 //
 // See openspec/changes/add-finetune-scheduler/specs/fair-scheduler/spec.md
 // for the invariants this function maintains.
 
-import type { Kind } from "../_shared/fireworks.ts";
+import type { Kind } from "../_shared/providers.ts";
 
 export interface QueuedJob {
   id: string;
   user_id: string;
   kind: Kind;
+  provider: string;
   gpu_count: number;
   created_at: string; // ISO-8601; rows arrive already ordered
 }
@@ -17,7 +18,7 @@ export interface QueuedJob {
 export type AdmitOutcome =
   | { status: "skip_user_active" }
   | { status: "stop_insufficient_gpu" } // earliest eligible candidate didn't fit → stop this tick
-  | { status: "admit"; fireworks_job_name: string }
+  | { status: "admit"; provider_job_id: string }
   | { status: "submit_quota_error" }
   | { status: "submit_failed"; status_code: number; body: string };
 
@@ -28,7 +29,7 @@ export interface AdmissionStep {
 
 export interface SubmitFn {
   (job: QueuedJob): Promise<
-    | { ok: true; fireworks_job_name: string }
+    | { ok: true; provider_job_id: string }
     | { ok: false; kind: "quota" }
     | { ok: false; kind: "client_error"; status: number; body: string }
   >;
@@ -40,17 +41,17 @@ export interface SubmitFn {
  * Caller responsibilities:
  *   - pass `queued` already ordered by created_at ASC
  *   - pass `activeUsers` containing user_ids currently in PROGRESS
- *   - pass `fwAvailable` derived from live Fireworks state
+ *   - pass `available` derived from live provider state
  *   - perform the DB state transitions after each step in `admit`/`submit_failed`
  */
 export async function runAdmission(
   queued: QueuedJob[],
   activeUsers: Set<string>,
-  fwAvailable: number,
+  available: number,
   submit: SubmitFn,
 ): Promise<AdmissionStep[]> {
   const steps: AdmissionStep[] = [];
-  let budget = fwAvailable;
+  let budget = available;
   const active = new Set(activeUsers);
 
   for (const job of queued) {
@@ -73,7 +74,7 @@ export async function runAdmission(
         job,
         outcome: {
           status: "admit",
-          fireworks_job_name: result.fireworks_job_name,
+          provider_job_id: result.provider_job_id,
         },
       });
       continue;
