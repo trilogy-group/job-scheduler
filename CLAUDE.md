@@ -147,8 +147,8 @@ supabase start
 # Serve functions locally (with env from .env)
 supabase functions serve
 
-# Deploy a specific function
-supabase functions deploy scheduler-tick --project-ref job-scheduler
+# Deploy a specific function — BOTH require --no-verify-jwt
+supabase functions deploy scheduler-tick --project-ref job-scheduler --no-verify-jwt
 supabase functions deploy jobs-api --project-ref job-scheduler --no-verify-jwt
 
 # List deployed functions with verify_jwt status
@@ -157,8 +157,12 @@ supabase functions list --project-ref job-scheduler -o json
 
 ### Important: JWT Verification
 
-- `jobs-api` uses **custom bearer tokens** (`sftq_` prefix), NOT Supabase JWTs. It MUST be deployed with `--no-verify-jwt`.
-- `scheduler-tick` is invoked internally by **pg_cron** via `net.http_post()` with `X-Scheduler-Secret`. It uses `verify_jwt=true` (default) because internal Edge Function calls are platform-authenticated.
+Both Edge Functions MUST be deployed with `--no-verify-jwt`. Each enforces its own auth in code:
+
+- `jobs-api` checks the `sftq_`-prefixed bearer token against `api_keys`.
+- `scheduler-tick` checks the `X-Scheduler-Secret` header against `SCHEDULER_SECRET`.
+
+Do not assume `pg_cron`'s `net.http_post()` is "platform-authenticated" — it is not. With `verify_jwt=true`, every cron tick is rejected at the Supabase edge gateway with `401 UNAUTHORIZED_NO_AUTH_HEADER` before the function code runs, silently stalling the queue (verified incident 2026-05-13).
 
 ### Environment Variables (`.env`)
 
