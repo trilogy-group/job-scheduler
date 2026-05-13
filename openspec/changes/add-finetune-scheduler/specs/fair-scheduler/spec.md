@@ -62,6 +62,11 @@ The tick SHALL select at most one `QUEUED` job per eligible user per iteration, 
 - **WHEN** the earliest eligible candidate has `gpu_count > fw_available`
 - **THEN** the tick SHALL skip it and try the next candidate; it MUST NOT reorder smaller jobs ahead of strictly earlier eligible candidates *whose user has no active job*. Informally: smaller later jobs may fill remaining headroom only once the earlier candidate has been admitted or determined ineligible for non-GPU reasons.
 
+#### Scenario: Big-job concurrency cap
+
+- **WHEN** the tick considers a candidate with `gpu_count >= 8` and at least `2` jobs in state `PROGRESS` already have `gpu_count >= 8`
+- **THEN** the tick MUST NOT admit the candidate; it SHALL skip it and continue evaluating the rest of the queue (smaller jobs may still admit). The cap is a per-class eligibility constraint, not a global resource shortage — it does not stop the admission loop.
+
 #### Scenario: Successful admission
 
 - **WHEN** a candidate job passes all admission checks and the Fireworks submit call returns `200` with a job name — `POST /supervisedFineTuningJobs` for `kind = 'SFT'` or `POST /dpoJobs` for `kind = 'DPO'`

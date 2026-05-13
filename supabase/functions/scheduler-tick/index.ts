@@ -10,7 +10,11 @@ import {
   isTerminal,
 } from "../_shared/fireworks.ts";
 import type { Kind } from "../_shared/fireworks.ts";
-import { runAdmission, QueuedJob } from "./admission.ts";
+import {
+  BIG_JOB_GPU_THRESHOLD,
+  QueuedJob,
+  runAdmission,
+} from "./admission.ts";
 
 Deno.serve(async (req: Request) => {
   const secret = Deno.env.get("SCHEDULER_SECRET");
@@ -127,18 +131,22 @@ Deno.serve(async (req: Request) => {
           .select("id, user_id, kind, gpu_count, created_at")
           .eq("state", "QUEUED")
           .order("created_at", { ascending: true }),
-        db.from("jobs").select("user_id").eq("state", "PROGRESS"),
+        db.from("jobs").select("user_id, gpu_count").eq("state", "PROGRESS"),
       ]);
     if (queuedErr) throw queuedErr;
     if (activeErr) throw activeErr;
 
     summary.queued_remaining = queuedRows?.length ?? 0;
     const activeUsers = new Set((activeRows ?? []).map((r) => r.user_id));
+    const bigJobsActive = (activeRows ?? []).filter(
+      (r) => (r.gpu_count ?? 0) >= BIG_JOB_GPU_THRESHOLD,
+    ).length;
     const queued = (queuedRows ?? []) as QueuedJob[];
 
     const steps = await runAdmission(
       queued,
       activeUsers,
+      bigJobsActive,
       fwAvailable,
       async (job) => {
         try {
@@ -203,7 +211,7 @@ Deno.serve(async (req: Request) => {
           .eq("state", "QUEUED");
         summary.submission_failed++;
       }
-      // skip_user_active / stop_insufficient_gpu / submit_quota_error: no-op
+      // skip_user_active / skip_big_cap / stop_insufficient_gpu / submit_quota_error: no-op
     }
 
     return json(summary);
