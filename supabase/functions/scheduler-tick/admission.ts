@@ -13,7 +13,7 @@ import type { Kind } from "../_shared/fireworks.ts";
 // stop), so smaller jobs queued behind a capped big-job can still admit —
 // same shape as `skip_user_active`.
 export const BIG_JOB_GPU_THRESHOLD = 8;
-export const MAX_BIG_JOBS_ACTIVE = 2;
+export const MAX_BIG_JOBS_ACTIVE = 1;
 
 export interface QueuedJob {
   id: string;

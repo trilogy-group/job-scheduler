@@ -133,47 +133,45 @@ test('empty queue returns empty steps', async () => {
   assert.deepEqual(steps, []);
 });
 
-test('big-job cap: 3rd 8-GPU job skipped when 2 already active, smaller job behind it admits', async () => {
-  // 2 big jobs already active. Queue: alice's 8-GPU (capped), bob's 4-GPU (eligible).
+test('big-job cap: 2nd 8-GPU job skipped when 1 already active, smaller job behind it admits', async () => {
+  // 1 big job already active (at the cap). Queue: alice's 8-GPU (capped), bob's 4-GPU (eligible).
   // Budget is generous (24) so the cap is the only blocker.
   const queue = [mkJob(1, 'alice', 'SFT', 8), mkJob(2, 'bob', 'SFT', 4)];
-  const steps = await runAdmission(queue, new Set(), 2, 24, alwaysOk());
+  const steps = await runAdmission(queue, new Set(), 1, 24, alwaysOk());
   assert.equal(steps[0].outcome.status, 'skip_big_cap');
   assert.equal(steps[1].outcome.status, 'admit');
   assert.equal(steps[1].job.id, 2);
 });
 
-test('big-job cap: 0 active + 3 big jobs queued → admit 2, skip 3rd', async () => {
+test('big-job cap: 0 active + 3 big jobs queued → admit 1, skip rest', async () => {
   const queue = [
     mkJob(1, 'alice', 'SFT', 8),
     mkJob(2, 'bob',   'SFT', 8),
     mkJob(3, 'carol', 'SFT', 8),
   ];
   const steps = await runAdmission(queue, new Set(), 0, 32, alwaysOk());
-  assert.deepEqual(steps.map((s) => s.outcome.status), ['admit', 'admit', 'skip_big_cap']);
+  assert.deepEqual(steps.map((s) => s.outcome.status), ['admit', 'skip_big_cap', 'skip_big_cap']);
 });
 
 test('big-job cap: counts gpu_count >= 8 as big (16-GPU also capped)', async () => {
-  // 1 big job active, queue head is a 16-GPU job. With cap=2 we admit it
-  // (1 active + this one == 2). A second 16-GPU would be capped.
+  // 1 big job already active = at the cap. Queue [16, 16] — both must be skipped.
   const queue = [mkJob(1, 'alice', 'SFT', 16), mkJob(2, 'bob', 'SFT', 16)];
   const steps = await runAdmission(queue, new Set(), 1, 64, alwaysOk());
-  assert.equal(steps[0].outcome.status, 'admit');
+  assert.equal(steps[0].outcome.status, 'skip_big_cap');
   assert.equal(steps[1].outcome.status, 'skip_big_cap');
 });
 
 test('big-job cap: small jobs unaffected by cap', async () => {
-  // 2 big jobs already active. Queue has only 4-GPU jobs — all should admit
+  // 1 big job already active. Queue has only 4-GPU jobs — all should admit
   // (within budget). The cap only affects gpu_count >= 8.
   const queue = [mkJob(1, 'alice', 'SFT', 4), mkJob(2, 'bob', 'SFT', 4)];
-  const steps = await runAdmission(queue, new Set(), 2, 8, alwaysOk());
+  const steps = await runAdmission(queue, new Set(), 1, 8, alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), ['admit', 'admit']);
 });
 
 test('big-job cap: admitting big-jobs in same tick respects the cap', async () => {
-  // 0 big active, but the cap should still hold within a single tick:
-  // job1 (8) admits → bigActive=1, job2 (8) admits → bigActive=2,
-  // job3 (8) skipped. job4 (4) follows and admits.
+  // 0 big active. Cap=1, so job1 (8) admits → bigActive=1, then job2 (8) and
+  // job3 (8) are both skip_big_cap. job4 (4) is a small job and admits.
   const queue = [
     mkJob(1, 'alice', 'SFT', 8),
     mkJob(2, 'bob',   'SFT', 8),
@@ -182,6 +180,6 @@ test('big-job cap: admitting big-jobs in same tick respects the cap', async () =
   ];
   const steps = await runAdmission(queue, new Set(), 0, 32, alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), [
-    'admit', 'admit', 'skip_big_cap', 'admit',
+    'admit', 'skip_big_cap', 'skip_big_cap', 'admit',
   ]);
 });

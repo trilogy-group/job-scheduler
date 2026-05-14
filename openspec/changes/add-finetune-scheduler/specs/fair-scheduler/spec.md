@@ -64,8 +64,8 @@ The tick SHALL select at most one `QUEUED` job per eligible user per iteration, 
 
 #### Scenario: Big-job concurrency cap
 
-- **WHEN** the tick considers a candidate with `gpu_count >= 8` and at least `2` jobs in state `PROGRESS` already have `gpu_count >= 8`
-- **THEN** the tick MUST NOT admit the candidate; it SHALL skip it and continue evaluating the rest of the queue (smaller jobs may still admit). The cap is a per-class eligibility constraint, not a global resource shortage — it does not stop the admission loop.
+- **WHEN** the tick considers a candidate with `gpu_count >= 8` and at least `1` big-job (gpu_count >= 8) is already active on Fireworks
+- **THEN** the tick MUST NOT admit the candidate; it SHALL skip it and continue evaluating the rest of the queue (smaller jobs may still admit). The cap is a per-class eligibility constraint, not a global resource shortage — it does not stop the admission loop. The big-job count is computed from live Fireworks state cross-referenced against the local jobs table: scheduler-submitted jobs contribute their DB `gpu_count`; jobs running on Fireworks with no matching DB row (out-of-band / `firectl` submissions) are conservatively treated as big-jobs.
 
 #### Scenario: Successful admission
 
