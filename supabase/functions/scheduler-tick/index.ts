@@ -97,23 +97,23 @@ Deno.serve(async (req: Request) => {
     }
 
     // --- Discover live GPU headroom + big-job count --------------------
-    // We trust Fireworks' `maxValue` (account ceiling, rarely changes) but
-    // NOT `usage` — that counter has been observed to get stuck at the max
-    // after jobs terminate (see Fireworks support ticket re: stale training
-    // quota). Instead we cross-reference live Fireworks jobs against our
-    // DB by `fireworks_job_name`:
-    //   - DB-known jobs: trust our row's `gpu_count` (we set it at submit).
-    //   - Bypass jobs (no matching DB row — e.g. submitted via `firectl`
-    //     directly to Fireworks): we have no truthful per-job GPU count
-    //     because the Fireworks SFT API doesn't expose it. Treat them as
-    //     `BIG_JOB_GPU_THRESHOLD` (i.e. assume big). This is conservative:
-    //     the big-job cap is a safety limit, so over-counting a bypass
-    //     submission is safer than under-counting.
+    // Budget is the SUM of every `training-*-count` quota Fireworks exposes
+    // (h100, h200, a100, b200, b300, ...). We trust Fireworks' own `usage`
+    // counter per quota: prior incidents where it stuck at maxValue have
+    // not recurred and recent ticks confirm it is accurate. As a safety
+    // net we still cross-reference our DB-known jobs against the live
+    // listActiveJobs response; if our recomputed usage drifts substantially
+    // from Fireworks' counter, we log a warn so ops can investigate.
+    //
+    // `big_jobs_active` (a count, not GPU sum) stays observational: we
+    // count Fireworks-active jobs whose DB row has `gpu_count >= 8`, and
+    // for jobs not in our DB (out-of-band `firectl` submissions) we
+    // conservatively treat them as big.
     let fwAvailable = 0;
     let bigJobsActive = 0;
     try {
-      const [quota, active, { data: knownRows, error: knownErr }] = await Promise.all([
-        fw.getTrainingGpuQuota(),
+      const [training, active, { data: knownRows, error: knownErr }] = await Promise.all([
+        fw.getAllTrainingGpuQuotas(),
         fw.listActiveJobsAllKinds(),
         db
           .from("jobs")
@@ -127,22 +127,28 @@ Deno.serve(async (req: Request) => {
           .filter((r) => typeof r.fireworks_job_name === "string")
           .map((r) => [r.fireworks_job_name as string, r.gpu_count as number]),
       );
-      let computedUsage = 0;
+      // Authoritative budget = total max − total usage across all training-* quotas.
+      fwAvailable = Math.max(0, training.totalMax - training.totalUsage);
+      summary.fw_quota_name = training.quotas.map((q) => q.name.replace(/^.*\//, "")).join("+");
+
+      // Cross-check: sum gpu_count across active jobs (db-known + conservative bypass)
+      // and warn if it materially disagrees with Fireworks' reported usage.
+      let recomputedUsage = 0;
       for (const a of active) {
         const known = knownGpuByName.get(a.job.name);
         const gpu = known ?? BIG_JOB_GPU_THRESHOLD;
-        computedUsage += gpu;
+        recomputedUsage += gpu;
         if (gpu >= BIG_JOB_GPU_THRESHOLD) bigJobsActive++;
       }
-      fwAvailable = Math.max(0, quota.maxValue - computedUsage);
-      summary.fw_quota_name = quota.name;
-      if (quota.usage !== computedUsage) {
+      if (Math.abs(recomputedUsage - training.totalUsage) >= 4) {
         console.warn(
-          `quota.usage drift: fireworks reports usage=${quota.usage}, computed=${computedUsage} from ${active.length} active jobs (db-known=${knownGpuByName.size})`,
+          `gpu usage drift: fireworks=${training.totalUsage}, recomputed=${recomputedUsage} ` +
+            `(active=${active.length}, db-known=${knownGpuByName.size}). ` +
+            `Trusting fireworks; if drift persists, investigate stale quota or bypass mis-sizing.`,
         );
       }
     } catch (e) {
-      console.warn("getTrainingGpuQuota / listActiveJobs failed; skipping admission", e);
+      console.warn("getAllTrainingGpuQuotas / listActiveJobs failed; skipping admission", e);
       return json({ ...summary, skipped_admission: true });
     }
     summary.fw_available = fwAvailable;

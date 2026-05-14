@@ -184,6 +184,44 @@ export class FireworksClient {
     const usage = typeof match.usage === "number" ? match.usage : 0;
     return { maxValue, usage, name: match.name };
   }
+
+  /**
+   * Aggregate every `training-*-count` quota into one global pool. Returns
+   * sum of `maxValue` and sum of `usage` across all training GPU types
+   * Fireworks exposes (h100, h200, a100, b200, b300, etc.). Used by the
+   * scheduler to compute total free GPU capacity instead of restricting
+   * to one accelerator family.
+   *
+   * Trusts Fireworks' `usage` field. If the counter goes stale again (we
+   * had one such incident in early May 2026), the caller's sanity-check
+   * against `listActiveJobsAllKinds()` will surface the drift via a
+   * warn log.
+   */
+  async getAllTrainingGpuQuotas(): Promise<{
+    quotas: Array<{ name: string; maxValue: number; usage: number }>;
+    totalMax: number;
+    totalUsage: number;
+  }> {
+    const res = await this.request(`${this.base}/quotas`);
+    if (!res.ok) throw await toError(res);
+    const body = await res.json() as {
+      quotas?: Array<
+        { name?: string; value?: string; maxValue?: string; usage?: number }
+      >;
+    };
+    const list = body.quotas ?? [];
+    const trainings = list.filter((q) =>
+      typeof q.name === "string" && /\/quotas\/training-[a-z0-9]+-count$/i.test(q.name)
+    );
+    const quotas = trainings.map((q) => ({
+      name: q.name as string,
+      maxValue: parseInt(q.maxValue ?? q.value ?? "0", 10),
+      usage: typeof q.usage === "number" ? q.usage : 0,
+    }));
+    const totalMax = quotas.reduce((s, q) => s + q.maxValue, 0);
+    const totalUsage = quotas.reduce((s, q) => s + q.usage, 0);
+    return { quotas, totalMax, totalUsage };
+  }
 }
 
 /** Extracts the trailing segment of `accounts/trilogy/<endpoint>/<id>`. */
