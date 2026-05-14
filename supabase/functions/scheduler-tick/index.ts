@@ -4,7 +4,6 @@
 import { dbClient } from "../_shared/db.ts";
 import { error, json } from "../_shared/response.ts";
 import {
-  extractGpuCount,
   FireworksClient,
   isFireworksError,
   isTerminal,
@@ -41,6 +40,7 @@ Deno.serve(async (req: Request) => {
       submission_failed: 0,
       queued_remaining: 0,
       fw_available: 0,
+      big_jobs_active: 0,
       fw_quota_name: "" as string,
       by_kind: { SFT: 0, DPO: 0, RFT: 0 } as Record<Kind, number>,
     };
@@ -92,29 +92,49 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // --- Discover live GPU headroom ------------------------------------
+    // --- Discover live GPU headroom + big-job count --------------------
     // We trust Fireworks' `maxValue` (account ceiling, rarely changes) but
     // NOT `usage` — that counter has been observed to get stuck at the max
     // after jobs terminate (see Fireworks support ticket re: stale training
-    // quota). Instead, compute in-use by summing gpu_count across live
-    // non-terminal SFT + DPO jobs on Fireworks.
+    // quota). Instead we cross-reference live Fireworks jobs against our
+    // DB by `fireworks_job_name`:
+    //   - DB-known jobs: trust our row's `gpu_count` (we set it at submit).
+    //   - Bypass jobs (no matching DB row — e.g. submitted via `firectl`
+    //     directly to Fireworks): we have no truthful per-job GPU count
+    //     because the Fireworks SFT API doesn't expose it. Treat them as
+    //     `BIG_JOB_GPU_THRESHOLD` (i.e. assume big). This is conservative:
+    //     the big-job cap is a safety limit, so over-counting a bypass
+    //     submission is safer than under-counting.
     let fwAvailable = 0;
+    let bigJobsActive = 0;
     try {
-      const [quota, active] = await Promise.all([
+      const [quota, active, { data: knownRows, error: knownErr }] = await Promise.all([
         fw.getTrainingGpuQuota(),
         fw.listActiveJobsAllKinds(),
+        db
+          .from("jobs")
+          .select("fireworks_job_name, gpu_count")
+          .not("fireworks_job_name", "is", null)
+          .in("state", ["PROGRESS"]),
       ]);
-      const computedUsage = active.reduce(
-        (sum, a) => sum + extractGpuCount(a.job, 4),
-        0,
+      if (knownErr) throw knownErr;
+      const knownGpuByName = new Map<string, number>(
+        (knownRows ?? [])
+          .filter((r) => typeof r.fireworks_job_name === "string")
+          .map((r) => [r.fireworks_job_name as string, r.gpu_count as number]),
       );
+      let computedUsage = 0;
+      for (const a of active) {
+        const known = knownGpuByName.get(a.job.name);
+        const gpu = known ?? BIG_JOB_GPU_THRESHOLD;
+        computedUsage += gpu;
+        if (gpu >= BIG_JOB_GPU_THRESHOLD) bigJobsActive++;
+      }
       fwAvailable = Math.max(0, quota.maxValue - computedUsage);
       summary.fw_quota_name = quota.name;
-      // Log when Fireworks' own usage counter disagrees with reality — useful
-      // signal for ops and for confirming the bug is gone once it's fixed.
       if (quota.usage !== computedUsage) {
         console.warn(
-          `quota.usage drift: fireworks reports usage=${quota.usage}, computed=${computedUsage} from ${active.length} active jobs`,
+          `quota.usage drift: fireworks reports usage=${quota.usage}, computed=${computedUsage} from ${active.length} active jobs (db-known=${knownGpuByName.size})`,
         );
       }
     } catch (e) {
@@ -122,6 +142,7 @@ Deno.serve(async (req: Request) => {
       return json({ ...summary, skipped_admission: true });
     }
     summary.fw_available = fwAvailable;
+    summary.big_jobs_active = bigJobsActive;
 
     // --- Admit queued jobs ----------------------------------------------
     const [{ data: queuedRows, error: queuedErr }, { data: activeRows, error: activeErr }] =
@@ -131,16 +152,13 @@ Deno.serve(async (req: Request) => {
           .select("id, user_id, kind, gpu_count, created_at")
           .eq("state", "QUEUED")
           .order("created_at", { ascending: true }),
-        db.from("jobs").select("user_id, gpu_count").eq("state", "PROGRESS"),
+        db.from("jobs").select("user_id").eq("state", "PROGRESS"),
       ]);
     if (queuedErr) throw queuedErr;
     if (activeErr) throw activeErr;
 
     summary.queued_remaining = queuedRows?.length ?? 0;
     const activeUsers = new Set((activeRows ?? []).map((r) => r.user_id));
-    const bigJobsActive = (activeRows ?? []).filter(
-      (r) => (r.gpu_count ?? 0) >= BIG_JOB_GPU_THRESHOLD,
-    ).length;
     const queued = (queuedRows ?? []) as QueuedJob[];
 
     const steps = await runAdmission(
