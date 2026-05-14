@@ -137,3 +137,7 @@ States: `QUEUED` → `PROGRESS` → `SUCCESS` | `FAIL`, plus `QUEUED → CANCELL
 - **pg_cron down** — no admissions happen; queue backs up; fix pg_cron or hit `scheduler-tick` manually with the secret.
 - **Quota exhausted on Fireworks** — tick admits nothing and stops; catches up next tick once a job finishes.
 - **Bad Fireworks payload** — job flips to `FAIL` with the Fireworks error body in `error`.
+
+## Testing
+
+`npm test` runs the full Node `node:test` suite (`node --test "tests/*.test.js"`). For a per-file index of what each test covers, shared fixture factories under `tests/fixtures/`, and the planned structural-invariant tier under `tests/invariants/`, see [`tests/README.md`](./tests/README.md) — that is the canonical entry point for both humans and agents navigating the suite.

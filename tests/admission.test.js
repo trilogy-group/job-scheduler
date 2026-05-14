@@ -11,10 +11,7 @@ import {
   MAX_BIG_JOBS_PER_USER,
   BIG_JOB_HEADROOM_RESERVE,
 } from '../supabase/functions/scheduler-tick/admission.ts';
-
-function mkJob(id, user, kind = 'SFT', gpu = 4, created_at = `2026-04-20T00:00:0${id}Z`) {
-  return { id, user_id: user, kind, gpu_count: gpu, created_at };
-}
+import { mkJob } from './fixtures/jobs.js';
 
 function alwaysOk(namePrefix = 'fw-') {
   return async (job) => ({ ok: true, fireworks_job_name: namePrefix + job.id });
