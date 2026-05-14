@@ -47,10 +47,10 @@ The tick SHALL select at most one `QUEUED` job per eligible user per iteration, 
 - **WHEN** multiple jobs are `QUEUED` and eligible — possibly mixing `SFT` and `DPO`
 - **THEN** the tick SHALL consider them in ascending `created_at` order **regardless of `kind`** and admit whichever fits the available GPU budget first.
 
-#### Scenario: Per-user concurrency limit spans kinds
+#### Scenario: Per-user concurrency caps split by job size
 
-- **WHEN** a user already has a job in state `PROGRESS` (of any `kind`)
-- **THEN** the tick MUST NOT admit any further jobs belonging to that user in this iteration — including a job of a different `kind`.
+- **WHEN** the tick considers a candidate job for user `U`
+- **THEN** the tick MUST enforce two independent caps: at most 2 concurrent small (`gpu_count < 8`) jobs and at most 1 concurrent big (`gpu_count >= 8`) job per user. Big-job concurrency is also DB-enforced via a partial unique index. Hitting either cap produces `skip_user_small_cap` / `skip_user_big_cap` and the tick continues evaluating remaining candidates (smaller jobs from other users may still admit).
 
 #### Scenario: GPU budget respected
 
@@ -62,10 +62,10 @@ The tick SHALL select at most one `QUEUED` job per eligible user per iteration, 
 - **WHEN** the earliest eligible candidate has `gpu_count > fw_available`
 - **THEN** the tick SHALL skip it and try the next candidate; it MUST NOT reorder smaller jobs ahead of strictly earlier eligible candidates *whose user has no active job*. Informally: smaller later jobs may fill remaining headroom only once the earlier candidate has been admitted or determined ineligible for non-GPU reasons.
 
-#### Scenario: Big-job concurrency cap
+#### Scenario: Big-job admission preserves small-job headroom
 
-- **WHEN** the tick considers a candidate with `gpu_count >= 8` and at least `1` big-job (gpu_count >= 8) is already active on Fireworks
-- **THEN** the tick MUST NOT admit the candidate; it SHALL skip it and continue evaluating the rest of the queue (smaller jobs may still admit). The cap is a per-class eligibility constraint, not a global resource shortage — it does not stop the admission loop. The big-job count is computed from live Fireworks state cross-referenced against the local jobs table: scheduler-submitted jobs contribute their DB `gpu_count`; jobs running on Fireworks with no matching DB row (out-of-band / `firectl` submissions) are conservatively treated as big-jobs.
+- **WHEN** the tick considers a big candidate (`gpu_count >= 8`)
+- **THEN** the tick MUST verify that admitting it would leave at least `BIG_JOB_HEADROOM_RESERVE` (=4) GPUs of remaining headroom — i.e. `fw_available - candidate.gpu_count >= 4`. If not, the candidate is skipped with `skip_big_headroom` and the tick continues evaluating smaller queued jobs. This preserves at least one small-job slot at the moment of big-job admission. There is no system-wide cap on concurrent big jobs; admission is naturally limited by per-user cap + budget + headroom rule.
 
 #### Scenario: Successful admission
 
@@ -82,14 +82,14 @@ The tick SHALL select at most one `QUEUED` job per eligible user per iteration, 
 - **WHEN** Fireworks returns a `4xx` error that is not quota-related (e.g. invalid payload)
 - **THEN** the tick SHALL set `state = 'FAIL'`, `completed_at = now()`, and `error` to the response body, and continue admitting other jobs.
 
-### Requirement: Database-enforced per-user concurrency invariant
+### Requirement: Database-enforced big-job per-user invariant
 
-The schema SHALL enforce that at most one job per user can be in state `PROGRESS` at any moment.
+The schema SHALL enforce at most one big-job (`gpu_count >= 8`) per user in state `PROGRESS` at any moment. Small-job concurrency is enforced in admission code only.
 
-#### Scenario: Concurrent admission of two jobs for one user is rejected
+#### Scenario: Concurrent admission of two big jobs for one user is rejected
 
-- **WHEN** two scheduler transactions concurrently attempt to set two different jobs of the same user to `PROGRESS`
-- **THEN** exactly one transaction SHALL commit; the other SHALL be rejected by a partial unique index `unique(user_id) where state = 'PROGRESS'`.
+- **WHEN** two scheduler transactions concurrently attempt to set two different big jobs (`gpu_count >= 8`) of the same user to `PROGRESS`
+- **THEN** exactly one transaction SHALL commit; the other SHALL be rejected by a partial unique index `unique(user_id) where state = 'PROGRESS' and gpu_count >= 8`.
 
 ### Requirement: Tick endpoint is only callable by the scheduler itself
 

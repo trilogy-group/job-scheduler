@@ -6,14 +6,18 @@
 
 import type { Kind } from "../_shared/fireworks.ts";
 
-// Concurrency cap on "big" jobs: jobs using BIG_JOB_GPU_THRESHOLD or more GPUs
-// are limited to MAX_BIG_JOBS_ACTIVE concurrent runs across the whole account.
-// Rationale: prevents large jobs from monopolising the quota and starving the
-// pool of small-job slots. Cap is enforced as a per-class skip (not a global
-// stop), so smaller jobs queued behind a capped big-job can still admit —
-// same shape as `skip_user_active`.
+// Size thresholds and concurrency caps.
+// "Big" = gpu_count >= BIG_JOB_GPU_THRESHOLD. Each user may have at most
+// MAX_BIG_JOBS_PER_USER concurrent big jobs and MAX_SMALL_JOBS_PER_USER
+// concurrent small jobs. There is no system-wide big-job cap — admission
+// is naturally limited by quota budget + BIG_JOB_HEADROOM_RESERVE.
 export const BIG_JOB_GPU_THRESHOLD = 8;
-export const MAX_BIG_JOBS_ACTIVE = 1;
+export const MAX_BIG_JOBS_PER_USER = 1;
+export const MAX_SMALL_JOBS_PER_USER = 2;
+// A big-job admission must leave at least this many GPUs of headroom so a
+// small job can fit immediately after. Prevents big admissions from zeroing
+// out the account-wide budget.
+export const BIG_JOB_HEADROOM_RESERVE = 4;
 
 export interface QueuedJob {
   id: string;
@@ -24,8 +28,9 @@ export interface QueuedJob {
 }
 
 export type AdmitOutcome =
-  | { status: "skip_user_active" }
-  | { status: "skip_big_cap" } // queued big-job blocked by MAX_BIG_JOBS_ACTIVE; smaller queued jobs may still admit
+  | { status: "skip_user_small_cap" } // user already at MAX_SMALL_JOBS_PER_USER concurrent small
+  | { status: "skip_user_big_cap" }   // user already at MAX_BIG_JOBS_PER_USER concurrent big
+  | { status: "skip_big_headroom" }   // admit would leave < BIG_JOB_HEADROOM_RESERVE free GPUs
   | { status: "stop_insufficient_gpu" } // earliest eligible candidate didn't fit → stop this tick
   | { status: "admit"; fireworks_job_name: string }
   | { status: "submit_quota_error" }
@@ -44,54 +49,66 @@ export interface SubmitFn {
   >;
 }
 
+function bumpCount(m: Map<string, number>, k: string): void {
+  m.set(k, (m.get(k) ?? 0) + 1);
+}
+
 /**
  * Drive the admission loop over the FIFO-ordered queue snapshot.
  *
  * Caller responsibilities:
  *   - pass `queued` already ordered by created_at ASC
- *   - pass `activeUsers` containing user_ids currently in PROGRESS
- *   - pass `bigJobsActive` = count of PROGRESS jobs with gpu_count >= BIG_JOB_GPU_THRESHOLD
+ *   - pass `smallActiveByUser` / `bigActiveByUser`: counts of each user's
+ *     currently-PROGRESS jobs split by size bucket
  *   - pass `fwAvailable` derived from live Fireworks state
  *   - perform the DB state transitions after each step in `admit`/`submit_failed`
  */
 export async function runAdmission(
   queued: QueuedJob[],
-  activeUsers: Set<string>,
-  bigJobsActive: number,
+  smallActiveByUser: Map<string, number>,
+  bigActiveByUser: Map<string, number>,
   fwAvailable: number,
   submit: SubmitFn,
 ): Promise<AdmissionStep[]> {
   const steps: AdmissionStep[] = [];
   let budget = fwAvailable;
-  const active = new Set(activeUsers);
-  let bigActive = bigJobsActive;
+  // Local copies so we can mutate as we admit within this tick.
+  const smallByUser = new Map(smallActiveByUser);
+  const bigByUser = new Map(bigActiveByUser);
 
   for (const job of queued) {
-    if (active.has(job.user_id)) {
-      steps.push({ job, outcome: { status: "skip_user_active" } });
-      continue;
+    const isBig = job.gpu_count >= BIG_JOB_GPU_THRESHOLD;
+
+    if (isBig) {
+      if ((bigByUser.get(job.user_id) ?? 0) >= MAX_BIG_JOBS_PER_USER) {
+        steps.push({ job, outcome: { status: "skip_user_big_cap" } });
+        continue;
+      }
+      // Headroom rule: don't admit a big job that would drain the account
+      // below the reserve. Smaller queued jobs may still be considered.
+      if (budget - job.gpu_count < BIG_JOB_HEADROOM_RESERVE) {
+        steps.push({ job, outcome: { status: "skip_big_headroom" } });
+        continue;
+      }
+    } else {
+      if ((smallByUser.get(job.user_id) ?? 0) >= MAX_SMALL_JOBS_PER_USER) {
+        steps.push({ job, outcome: { status: "skip_user_small_cap" } });
+        continue;
+      }
     }
-    if (
-      job.gpu_count >= BIG_JOB_GPU_THRESHOLD &&
-      bigActive >= MAX_BIG_JOBS_ACTIVE
-    ) {
-      // Big-job cap is per-class, not a global resource shortage — skip this
-      // candidate so smaller queued jobs behind it can still be considered.
-      steps.push({ job, outcome: { status: "skip_big_cap" } });
-      continue;
-    }
+
     if (job.gpu_count > budget) {
-      // Earliest eligible (user-free) candidate doesn't fit. Per spec:
-      // we MUST NOT reorder smaller later jobs ahead of this one, so stop.
+      // Earliest eligible candidate doesn't fit. Per spec: we MUST NOT
+      // reorder smaller later jobs ahead of this one, so stop.
       steps.push({ job, outcome: { status: "stop_insufficient_gpu" } });
       break;
     }
 
     const result = await submit(job);
     if (result.ok) {
-      active.add(job.user_id);
       budget -= job.gpu_count;
-      if (job.gpu_count >= BIG_JOB_GPU_THRESHOLD) bigActive++;
+      if (isBig) bumpCount(bigByUser, job.user_id);
+      else bumpCount(smallByUser, job.user_id);
       steps.push({
         job,
         outcome: {

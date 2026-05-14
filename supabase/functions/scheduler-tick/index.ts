@@ -15,6 +15,10 @@ import {
   runAdmission,
 } from "./admission.ts";
 
+function bumpMap(m: Map<string, number>, k: string): void {
+  m.set(k, (m.get(k) ?? 0) + 1);
+}
+
 Deno.serve(async (req: Request) => {
   const secret = Deno.env.get("SCHEDULER_SECRET");
   if (!secret || req.headers.get("x-scheduler-secret") !== secret) {
@@ -152,19 +156,25 @@ Deno.serve(async (req: Request) => {
           .select("id, user_id, kind, gpu_count, created_at")
           .eq("state", "QUEUED")
           .order("created_at", { ascending: true }),
-        db.from("jobs").select("user_id").eq("state", "PROGRESS"),
+        db.from("jobs").select("user_id, gpu_count").eq("state", "PROGRESS"),
       ]);
     if (queuedErr) throw queuedErr;
     if (activeErr) throw activeErr;
 
     summary.queued_remaining = queuedRows?.length ?? 0;
-    const activeUsers = new Set((activeRows ?? []).map((r) => r.user_id));
+    const smallActiveByUser = new Map<string, number>();
+    const bigActiveByUser = new Map<string, number>();
+    for (const r of activeRows ?? []) {
+      const gpu = (r.gpu_count as number | null) ?? 0;
+      if (gpu >= BIG_JOB_GPU_THRESHOLD) bumpMap(bigActiveByUser, r.user_id);
+      else bumpMap(smallActiveByUser, r.user_id);
+    }
     const queued = (queuedRows ?? []) as QueuedJob[];
 
     const steps = await runAdmission(
       queued,
-      activeUsers,
-      bigJobsActive,
+      smallActiveByUser,
+      bigActiveByUser,
       fwAvailable,
       async (job) => {
         try {
@@ -229,7 +239,8 @@ Deno.serve(async (req: Request) => {
           .eq("state", "QUEUED");
         summary.submission_failed++;
       }
-      // skip_user_active / skip_big_cap / stop_insufficient_gpu / submit_quota_error: no-op
+      // skip_user_small_cap / skip_user_big_cap / skip_big_headroom /
+      // stop_insufficient_gpu / submit_quota_error: no-op
     }
 
     return json(summary);
