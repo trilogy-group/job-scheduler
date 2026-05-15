@@ -7,7 +7,8 @@
   --bg-hover: #1c2024;
   --fg: #f8f8f8;
   --fg-muted: #9a9fa5;
-  --fg-subtle: #6d7277;
+  /* WCAG 2.1 AA: #9aa0a6 yields 7.34:1 on --bg (#0a0e11) and 6.87:1 on --bg-elev (#13161a). */
+  --fg-subtle: #9aa0a6;
   --border: #23272b;
   --border-strong: #373b40;
   --color-accent-300: #00ccf9;
