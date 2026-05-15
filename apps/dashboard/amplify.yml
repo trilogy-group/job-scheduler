@@ -1,0 +1,44 @@
+# AWS Amplify Hosting (Gen 2) build specification
+# App: job-scheduler-dashboard (Next.js SSR via WEB_COMPUTE platform)
+version: 1
+applications:
+  - appRoot: apps/dashboard
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - npx next build
+      artifacts:
+        # Next.js SSR build output for Amplify WEB_COMPUTE platform
+        baseDirectory: .next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+          - .next/cache/**/*
+      # ---------------------------------------------------------------
+      # Environment variables
+      # ---------------------------------------------------------------
+      # Active: single-user auth bypass. The dashboard reads
+      # DASHBOARD_USER_ID and serves all pages as that user. Configure
+      # this value in the Amplify Console (App settings → Environment
+      # variables) — do NOT commit real user IDs here.
+      #
+      #   DASHBOARD_USER_ID=<uuid-of-the-single-active-user>
+      #
+      # Deferred: Keycloak / NextAuth integration. These stubs are
+      # intentionally commented out until the Keycloak client is
+      # provisioned. See apps/dashboard/docs/auth-integration.md for
+      # the migration path. When enabling, set these in the Amplify
+      # Console and REMOVE the DASHBOARD_USER_ID bypass above.
+      #
+      # KEYCLOAK_DEFERRED:
+      #   KEYCLOAK_ISSUER=<https://keycloak.example.com/realms/job-scheduler>
+      #   KEYCLOAK_CLIENT_ID=<job-scheduler-dashboard>
+      #   KEYCLOAK_CLIENT_SECRET=<rotate-via-keycloak-admin>
+      #   NEXTAUTH_SECRET=<openssl rand -base64 32>
+      #   NEXTAUTH_URL=<https://dashboard.job-scheduler.example.com>
