@@ -11,7 +11,13 @@ const NAV_ITEMS = [
 export function NavBar() {
   const pathname = usePathname() ?? '';
   return (
-    <nav aria-label="primary navigation" className="flex gap-1 px-4 py-2 border-b bg-white">
+    <nav
+      aria-label="primary navigation"
+      className="flex items-center gap-1 px-4 py-2 border-b border-[#23272b] bg-[#0a0e11]"
+    >
+      <span className="text-[#f8f8f8] text-sm font-semibold mr-4 tracking-tight">
+        Job Scheduler
+      </span>
       {NAV_ITEMS.map(({ href, label, testId }) => {
         const active = pathname === href || pathname.startsWith(href + '/');
         return (
@@ -22,8 +28,8 @@ export function NavBar() {
             aria-current={active ? 'page' : undefined}
             className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
               active
-                ? 'bg-blue-600 text-white font-bold underline'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-[#00a1c8]/15 text-[#00a1c8] font-semibold'
+                : 'text-[#9a9fa5] hover:text-[#f8f8f8] hover:bg-[#1c2024]'
             }`}
           >
             {label}

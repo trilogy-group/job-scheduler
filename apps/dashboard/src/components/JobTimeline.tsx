@@ -9,32 +9,32 @@ function StepMarker({ status }: { status: StepStatus }) {
   switch (status) {
     case 'success':
       return (
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-sm font-bold">
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#67bb6b]/15 text-[#67bb6b] text-sm font-bold">
           ✓
         </span>
       );
     case 'fail':
       return (
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 text-sm font-bold">
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#f04c5a]/15 text-[#f04c5a] text-sm font-bold">
           ✗
         </span>
       );
     case 'cancelled':
       return (
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 text-yellow-700 text-sm font-bold">
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#86909b]/15 text-[#86909b] text-sm font-bold">
           ◌
         </span>
       );
     case 'done':
       return (
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-sm font-bold">
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00a1c8]/15 text-[#00a1c8] text-sm font-bold">
           ●
         </span>
       );
     case 'pending':
     default:
       return (
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-400 text-sm">
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#23272b] text-[#6d7277] text-sm">
           ◌
         </span>
       );
@@ -97,24 +97,24 @@ export function JobTimeline({ job }: { job: JobEnriched }) {
 
   return (
     <div className="space-y-2">
-      <ol className="relative border-l border-gray-200 ml-3 space-y-6 py-2">
+      <ol className="relative border-l border-[#23272b] ml-3 space-y-6 py-2">
         <li className="ml-4">
           <div className="absolute -left-3 mt-0.5">
             <StepMarker status="done" />
           </div>
-          <div className="text-sm font-medium text-gray-900">Queued</div>
-          <div className="text-xs text-gray-500">{fmtTs(job.created_at)}</div>
+          <div className="text-sm font-medium text-[#f8f8f8]">Queued</div>
+          <div className="text-xs text-[#6d7277]">{fmtTs(job.created_at)}</div>
         </li>
 
         <li className="ml-4">
           <div className="absolute -left-3 mt-0.5">
             <StepMarker status={startedStatus} />
           </div>
-          <div className="text-sm font-medium text-gray-900">Started</div>
-          <div className="text-xs text-gray-500">
+          <div className="text-sm font-medium text-[#f8f8f8]">Started</div>
+          <div className="text-xs text-[#6d7277]">
             {fmtTs(job.started_at)}
             {startedDuration ? (
-              <span className="ml-2 text-gray-600">(+{startedDuration} from queued)</span>
+              <span className="ml-2 text-[#9a9fa5]">(+{startedDuration} from queued)</span>
             ) : null}
           </div>
         </li>
@@ -123,20 +123,20 @@ export function JobTimeline({ job }: { job: JobEnriched }) {
           <div className="absolute -left-3 mt-0.5">
             <StepMarker status={completedStatus} />
           </div>
-          <div className="text-sm font-medium text-gray-900">
+          <div className="text-sm font-medium text-[#f8f8f8]">
             {job.completed_at ? terminalLabel(job.state) : 'Completed'}
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-[#6d7277]">
             {fmtTs(job.completed_at)}
             {completedDuration ? (
-              <span className="ml-2 text-gray-600">(+{completedDuration} from started)</span>
+              <span className="ml-2 text-[#9a9fa5]">(+{completedDuration} from started)</span>
             ) : null}
           </div>
         </li>
       </ol>
 
       {job.state === 'FAIL' && job.error ? (
-        <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className="mt-3 rounded border border-[#f04c5a]/30 bg-[#f04c5a]/10 p-3 text-sm text-[#f04c5a]">
           <div className="font-medium mb-1">Error</div>
           <pre className="whitespace-pre-wrap font-mono text-xs">{job.error}</pre>
         </div>
