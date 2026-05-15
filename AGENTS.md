@@ -82,3 +82,17 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+
+---
+
+## Deployed UI surface closure invariant
+
+Any ticket whose deliverable is a **deployed UI surface** MUST NOT be marked closed until:
+
+1. The closing turn dispatches a `ui-tester` sub-agent (or equivalent `web_fetch` fallback, flagged as such) against the live deployed URL — **not localhost**.
+2. The verification returns a PASS verdict naming the specific visible components rendering (e.g., QueueTable, JobChart). Empty-state (zero rows) is acceptable; connection-error / localhost fallback is not.
+3. The screenshot path (or web_fetch URL + response excerpt) is captured in the ticket note via `--append-notes`.
+
+If verification is skipped or fails, the ticket MUST remain `in_progress` and the failure reason MUST be surfaced to the meta-controller.
+
+---
