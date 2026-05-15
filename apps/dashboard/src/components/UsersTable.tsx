@@ -19,7 +19,7 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
 
   return (
     <div>
-      <div className="flex gap-2 mb-3 items-center">
+      <div className="flex gap-2 mb-4 items-center">
         <input
           type="search"
           placeholder="Search users…"
@@ -27,34 +27,109 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
           name="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="border rounded px-3 py-1.5 text-sm w-56"
+          className="px-3 py-1.5 text-sm w-56 rounded-lg transition-colors"
+          style={{
+            background: 'var(--bg-elev)',
+            border: '1px solid var(--border)',
+            color: 'var(--fg)',
+          }}
         />
-        <span className="text-xs text-gray-500">{filtered.length} users</span>
+        <span
+          className="text-xs ml-auto font-mono tabular-nums"
+          style={{ color: 'var(--fg-subtle)' }}
+        >
+          {filtered.length} users
+        </span>
       </div>
       {filtered.length === 0 ? (
-        <div className="text-center text-gray-500 py-12">No users found.</div>
+        <div
+          className="text-center py-16 rounded-xl"
+          style={{
+            background: 'var(--bg-elev)',
+            border: '1px solid var(--border)',
+            color: 'var(--fg-subtle)',
+          }}
+        >
+          <p className="text-sm">No users found.</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Email</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Jobs</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Success %</th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-gray-700">GPU-hrs</th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-gray-700">Issues</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Joined</th>
+        <div
+          className="overflow-x-auto rounded-xl"
+          style={{ border: '1px solid var(--border)' }}
+        >
+          <table
+            className="min-w-full text-sm"
+            style={{ background: 'var(--bg-elev)' }}
+          >
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {[
+                  { label: 'Email', hideOnSm: false },
+                  { label: 'Jobs', hideOnSm: false },
+                  { label: 'Success %', hideOnSm: false },
+                  { label: 'GPU-hrs', hideOnSm: true },
+                  { label: 'Issues', hideOnSm: true },
+                  { label: 'Joined', hideOnSm: false },
+                ].map((h) => (
+                  <th
+                    key={h.label}
+                    className={`px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider${h.hideOnSm ? ' hidden sm:table-cell' : ''}`}
+                    style={{ color: 'var(--fg-subtle)' }}
+                  >
+                    {h.label}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((u, idx) => (
-                <tr key={u.id} className={idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}>
-                  <td className="px-3 py-2 text-gray-900">{u.email}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.job_count}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.success_rate}%</td>
-                  <td className="hidden sm:table-cell px-3 py-2 text-gray-700">{u.gpu_hours}</td>
-                  <td className="hidden sm:table-cell px-3 py-2 text-gray-700">{u.issues}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.created_at.slice(0, 10)}</td>
+            <tbody>
+              {filtered.map((u) => (
+                <tr
+                  key={u.id}
+                  className="transition-colors"
+                  style={{ borderBottom: '1px solid var(--border)' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = '';
+                  }}
+                >
+                  <td
+                    className="px-3 py-2 font-medium"
+                    style={{ color: 'var(--fg)' }}
+                  >
+                    {u.email}
+                  </td>
+                  <td
+                    className="px-3 py-2 font-mono text-xs tabular-nums"
+                    style={{ color: 'var(--fg-muted)' }}
+                  >
+                    {u.job_count}
+                  </td>
+                  <td
+                    className="px-3 py-2 font-mono text-xs tabular-nums"
+                    style={{ color: 'var(--fg-muted)' }}
+                  >
+                    {u.success_rate}%
+                  </td>
+                  <td
+                    className="hidden sm:table-cell px-3 py-2 font-mono text-xs tabular-nums"
+                    style={{ color: 'var(--fg-muted)' }}
+                  >
+                    {u.gpu_hours}
+                  </td>
+                  <td
+                    className="hidden sm:table-cell px-3 py-2 font-mono text-xs tabular-nums"
+                    style={{ color: 'var(--fg-muted)' }}
+                  >
+                    {u.issues}
+                  </td>
+                  <td
+                    className="px-3 py-2 font-mono text-xs tabular-nums"
+                    style={{ color: 'var(--fg-subtle)' }}
+                  >
+                    {u.created_at.slice(0, 10)}
+                  </td>
                 </tr>
               ))}
             </tbody>

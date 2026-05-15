@@ -1,1 +1,93 @@
 @import 'tailwindcss';
+
+/* ==========================================
+   Synapse Design System Tokens
+   Source: synapse.ti.trilogy.com CSS bundle
+   ========================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Brand / Accent (Cyan) */
+  --color-accent-300: #00ccf9;
+  --color-accent-500: #00a1c8;
+
+  /* Status / Semantic */
+  --color-ok: #67bb6b;
+  --color-warn: #f3ae58;
+  --color-bad: #f04c5a;
+  --color-idle: #86909b;
+
+  /* Dark surface tokens (default) */
+  --bg: #0a0e11;
+  --bg-elev: #13161a;
+  --bg-hover: #1c2024;
+  --fg: #f8f8f8;
+  --fg-muted: #9a9fa5;
+  --fg-subtle: #6d7277;
+  --border: #23272b;
+  --border-strong: #373b40;
+
+  /* Transitions */
+  --default-transition-duration: 0.15s;
+  --default-transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #fcfcfc;
+    --bg-elev: #f5f5f5;
+    --bg-hover: #eeeeee;
+    --fg: #0e1216;
+    --fg-muted: #44484d;
+    --fg-subtle: #6d7277;
+    --border: #d9dfe5;
+    --border-strong: #bfc5ca;
+  }
+}
+
+/* Global body styles */
+html, body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Custom card shadow (Synapse style) */
+.card-shadow {
+  box-shadow: 0 1px rgba(0,0,0,0.04), 0 4px 24px -8px rgba(0,0,0,0.12);
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Pulse animation for PROGRESS state dot */
+@keyframes synapse-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-synapse-pulse {
+  animation: synapse-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

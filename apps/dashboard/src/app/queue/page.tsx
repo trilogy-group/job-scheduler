@@ -39,8 +39,8 @@ export default async function QueuePage() {
   }
 
   return (
-    <main className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Active Queue</h1>
+    <main className="p-6 max-w-[1600px] mx-auto space-y-4">
+      <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--fg)' }}>Active Queue</h1>
       <QueueTable jobs={jobs} />
     </main>
   );

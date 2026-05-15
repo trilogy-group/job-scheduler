@@ -7,12 +7,13 @@ import { humanizeAge } from '@/lib/time';
 
 const ALL_STATES = ['QUEUED', 'PROGRESS', 'SUCCESS', 'FAIL', 'CANCELLED'] as const;
 
-const STATE_COLORS: Record<string, string> = {
-  QUEUED: 'bg-gray-100 text-gray-800',
-  PROGRESS: 'bg-blue-100 text-blue-800',
-  SUCCESS: 'bg-green-100 text-green-800',
-  FAIL: 'bg-red-100 text-red-800',
-  CANCELLED: 'bg-yellow-100 text-yellow-800',
+// Synapse status chip colors for filter buttons
+const STATE_CHIP: Record<string, { bg: string; border: string; text: string }> = {
+  QUEUED: { bg: 'rgba(134,144,155,0.08)', border: 'rgba(134,144,155,0.3)', text: '#86909b' },
+  PROGRESS: { bg: 'rgba(0,161,200,0.08)', border: 'rgba(0,161,200,0.3)', text: '#00a1c8' },
+  SUCCESS: { bg: 'rgba(103,187,107,0.08)', border: 'rgba(103,187,107,0.3)', text: '#67bb6b' },
+  FAIL: { bg: 'rgba(240,76,90,0.08)', border: 'rgba(240,76,90,0.3)', text: '#f04c5a' },
+  CANCELLED: { bg: 'rgba(109,114,119,0.08)', border: 'rgba(109,114,119,0.3)', text: '#6d7277' },
 };
 
 export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
@@ -55,7 +56,8 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-2 mb-3 items-center">
+      {/* Search + Filter chips */}
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
         <input
           type="search"
           placeholder="Search jobs…"
@@ -63,60 +65,137 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
           name="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="border rounded px-3 py-1.5 text-sm w-56"
+          className="px-3 py-1.5 text-sm w-56 rounded-lg transition-colors"
+          style={{
+            background: 'var(--bg-elev)',
+            border: '1px solid var(--border)',
+            color: 'var(--fg)',
+          }}
         />
-        {ALL_STATES.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => toggleState(s)}
-            aria-pressed={activeStates.has(s)}
-            data-testid={`filter-${s}`}
-            className={`px-2 py-1 rounded text-xs font-medium border transition-opacity ${STATE_COLORS[s]} ${
-              activeStates.has(s) ? 'opacity-100' : 'opacity-30'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-        <span className="text-xs text-gray-500 ml-auto">{filtered.length} jobs</span>
+        {ALL_STATES.map((s) => {
+          const chip = STATE_CHIP[s];
+          const active = activeStates.has(s);
+          return (
+            <button
+              key={s}
+              type="button"
+              onClick={() => toggleState(s)}
+              aria-pressed={active}
+              data-testid={`filter-${s}`}
+              className="px-2.5 py-1 rounded-full text-xs font-medium transition-opacity"
+              style={{
+                background: active ? chip.bg : 'transparent',
+                border: `1px solid ${active ? chip.border : 'var(--border)'}`,
+                color: active ? chip.text : 'var(--fg-subtle)',
+                opacity: active ? 1 : 0.5,
+              }}
+            >
+              {s}
+            </button>
+          );
+        })}
+        <span
+          className="text-xs ml-auto font-mono tabular-nums"
+          style={{ color: 'var(--fg-subtle)' }}
+        >
+          {filtered.length} jobs
+        </span>
       </div>
+
+      {/* Table or empty state */}
       {filtered.length === 0 ? (
-        <div className="text-center text-gray-500 py-12">
-          No jobs found.
+        <div
+          className="text-center py-16 rounded-xl"
+          style={{
+            background: 'var(--bg-elev)',
+            border: '1px solid var(--border)',
+            color: 'var(--fg-subtle)',
+          }}
+        >
+          <p className="text-sm">No jobs match the current filters.</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--fg-subtle)' }}>
+            Try clearing a filter chip above.
+          </p>
         </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">#</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Name</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">User</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Kind</th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-gray-700">GPUs</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">State</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Age</th>
+        <div
+          className="overflow-x-auto rounded-xl"
+          style={{ border: '1px solid var(--border)' }}
+        >
+          <table
+            className="min-w-full text-sm"
+            style={{ background: 'var(--bg-elev)' }}
+          >
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['#', 'Name', 'User', 'Kind', 'GPUs', 'State', 'Age'].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider${i === 4 ? ' hidden sm:table-cell' : ''}`}
+                    style={{ color: 'var(--fg-subtle)' }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((job, idx) => {
+            <tbody>
+              {filtered.map((job) => {
                 const positionLabel =
                   job.state === 'PROGRESS' ? '▶' : String(queuedOrder.get(job.id) ?? '');
                 const name = job.display_name ?? job.fireworks_job_name ?? job.id.slice(0, 8);
                 const user = job.user_email ?? job.user_id.slice(0, 8);
-                const zebra = idx % 2 === 1 ? 'bg-gray-50' : 'bg-white';
                 return (
-                  <tr key={job.id} className={zebra}>
-                    <td className="px-3 py-2 text-gray-700">{positionLabel}</td>
-                    <td className="px-3 py-2 text-gray-900">{name}</td>
-                    <td className="px-3 py-2 text-gray-700">{user}</td>
-                    <td className="px-3 py-2 text-gray-700">{job.kind}</td>
-                    <td className="hidden sm:table-cell px-3 py-2 text-gray-700">{job.gpu_count}</td>
+                  <tr
+                    key={job.id}
+                    className="transition-colors"
+                    style={{ borderBottom: '1px solid var(--border)' }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = '';
+                    }}
+                  >
+                    <td
+                      className="px-3 py-2 font-mono text-xs tabular-nums"
+                      style={{ color: 'var(--fg-subtle)' }}
+                    >
+                      {positionLabel}
+                    </td>
+                    <td
+                      className="px-3 py-2 font-medium max-w-xs truncate"
+                      style={{ color: 'var(--fg)' }}
+                    >
+                      {name}
+                    </td>
+                    <td
+                      className="px-3 py-2 font-mono text-xs"
+                      style={{ color: 'var(--fg-muted)' }}
+                    >
+                      {user}
+                    </td>
+                    <td
+                      className="px-3 py-2 text-xs"
+                      style={{ color: 'var(--fg-muted)' }}
+                    >
+                      {job.kind}
+                    </td>
+                    <td
+                      className="hidden sm:table-cell px-3 py-2 font-mono text-xs tabular-nums"
+                      style={{ color: 'var(--fg-muted)' }}
+                    >
+                      {job.gpu_count}
+                    </td>
                     <td className="px-3 py-2">
                       <StateBadge state={job.state} />
                     </td>
-                    <td className="px-3 py-2 text-gray-700">{humanizeAge(job.created_at)}</td>
+                    <td
+                      className="px-3 py-2 font-mono text-xs tabular-nums"
+                      style={{ color: 'var(--fg-subtle)' }}
+                    >
+                      {humanizeAge(job.created_at)}
+                    </td>
                   </tr>
                 );
               })}
