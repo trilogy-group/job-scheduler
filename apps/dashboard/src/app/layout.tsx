@@ -4,19 +4,17 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Job Scheduler Dashboard',
-  description: 'Operator dashboard for the Fireworks job scheduler.',
+  description: 'Operator dashboard for the Fireworks fine-tuning job scheduler.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-[var(--bg)] text-[var(--fg)] min-h-screen">
         <NavBar />
-        {children}
+        <main className="px-4 py-6 max-w-[1600px] mx-auto">
+          {children}
+        </main>
       </body>
     </html>
   );
