@@ -114,7 +114,7 @@ export function JobTimeline({ job }: { job: JobEnriched }) {
           <div className="text-xs text-gray-500">
             {fmtTs(job.started_at)}
             {startedDuration ? (
-              <span className="ml-2 text-gray-400">(+{startedDuration} from queued)</span>
+              <span className="ml-2 text-gray-600">(+{startedDuration} from queued)</span>
             ) : null}
           </div>
         </li>
@@ -129,7 +129,7 @@ export function JobTimeline({ job }: { job: JobEnriched }) {
           <div className="text-xs text-gray-500">
             {fmtTs(job.completed_at)}
             {completedDuration ? (
-              <span className="ml-2 text-gray-400">(+{completedDuration} from started)</span>
+              <span className="ml-2 text-gray-600">(+{completedDuration} from started)</span>
             ) : null}
           </div>
         </li>
