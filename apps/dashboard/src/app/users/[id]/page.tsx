@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { StateBadge } from '@/components/StateBadge';
 import Breadcrumb from '@/components/layout/Breadcrumb';
 import JobsOverTimeChart, {
   type JobsOverTimePoint,
@@ -243,7 +244,7 @@ export default async function UserDetailPage({
                       </Link>
                     </td>
                     <td className="px-3 py-2">{j.kind}</td>
-                    <td className="px-3 py-2">{j.state}</td>
+                    <td className="px-3 py-2"><StateBadge state={j.state} /></td>
                     <td className="px-3 py-2">{j.gpu_count}</td>
                     <td className="px-3 py-2">{fmtDate(j.created_at)}</td>
                     <td className="px-3 py-2">{fmtDate(j.started_at)}</td>
