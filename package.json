@@ -10,7 +10,8 @@
     "revoke-key": "node scripts/revoke_key.js",
     "dump": "node scripts/dump_state.js",
     "test": "node --experimental-strip-types --test tests/*.test.js",
-    "lint:md": "npx prettier --check \"**/*.md\" --ignore-path .gitignore"
+    "lint:md": "npx prettier --check \"**/*.md\" --ignore-path .gitignore",
+    "seed-dashboard": "node --experimental-strip-types scripts/seed-dashboard.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
