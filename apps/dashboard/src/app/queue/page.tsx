@@ -1,22 +1,19 @@
-import { fetchQueueJobs } from '@/lib/queue';
+import { createServerClient } from '@/lib/supabase-server';
 import { QueueTable } from '@/components/QueueTable';
 import type { JobEnriched } from '@/lib/types';
 
-export const revalidate = 15;
-
 export default async function QueuePage() {
-  let jobs: JobEnriched[];
-  try {
-    jobs = await fetchQueueJobs();
-  } catch {
-    jobs = [];
-  }
+  const supabase = createServerClient();
+  const { data } = await supabase
+    .from('jobs_enriched')
+    .select('*')
+    .in('state', ['QUEUED', 'PROGRESS'])
+    .order('created_at', { ascending: true });
+  const jobs: JobEnriched[] = (data ?? []) as JobEnriched[];
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        Queue ({jobs.length})
-      </h2>
+    <main className="p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Active Queue</h1>
       <QueueTable jobs={jobs} />
-    </div>
+    </main>
   );
 }

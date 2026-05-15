@@ -1,21 +1,17 @@
 import Link from 'next/link';
-import { getServerSupabase } from '@/lib/supabase-server';
-import { StateBadge } from '@/components/StateBadge';
-import { humanizeAge } from '@/lib/time';
-import {
-  JobsOverTimeChart,
+import Breadcrumb from '@/components/layout/Breadcrumb';
+import JobsOverTimeChart, {
   type JobsOverTimePoint,
 } from '@/components/charts/JobsOverTimeChart';
-import type { JobKind, JobState } from '@/lib/types';
+import { createServerClient } from '@/lib/supabase-server';
 
-type SortOrder = 'asc' | 'desc';
+type Params = { id: string };
+type SearchParams = { sort?: string };
 
-interface UserRow {
-  id: string;
-  email: string | null;
-}
+type JobState = 'QUEUED' | 'PROGRESS' | 'SUCCESS' | 'FAIL' | 'CANCELLED';
+type JobKind = 'SFT' | 'DPO' | 'RFT';
 
-interface JobRow {
+type JobRow = {
   id: string;
   kind: JobKind;
   state: JobState;
@@ -24,274 +20,255 @@ interface JobRow {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+};
+
+type UserRow = {
+  id: string;
+  email: string;
+};
+
+type SortOrder = 'asc' | 'desc';
+
+type Metrics = {
+  totalJobs: number;
+  successRate: number;
+  gpuHours: number;
+  fairnessViolations: number;
+};
+
+function parseSort(raw: string | undefined): SortOrder {
+  return raw === 'asc' ? 'asc' : 'desc';
 }
 
-interface UserMetrics {
-  total_jobs: number;
-  success_rate: number; // 0..1
-  gpu_hours: number;
-  fairness_violations: number;
-}
+function computeMetrics(jobs: JobRow[]): Metrics {
+  const total = jobs.length;
+  const successes = jobs.filter((j) => j.state === 'SUCCESS').length;
+  const successRate = total === 0 ? 0 : successes / total;
 
-function computeGpuHours(jobs: JobRow[]): number {
-  let total = 0;
+  let gpuHours = 0;
   for (const j of jobs) {
     if (
       (j.state === 'SUCCESS' || j.state === 'FAIL') &&
       j.started_at !== null &&
       j.completed_at !== null
     ) {
-      const seconds =
-        (new Date(j.completed_at).getTime() -
-          new Date(j.started_at).getTime()) /
-        1000;
-      total += (j.gpu_count * seconds) / 3600;
-    }
-  }
-  return Math.round(total * 10) / 10;
-}
-
-function computeFairnessViolations(jobs: JobRow[]): number {
-  const filtered = jobs
-    .filter((j) => j.started_at !== null)
-    .slice()
-    .sort(
-      (a, b) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-    );
-  let violations = 0;
-  for (let i = 0; i < filtered.length; i++) {
-    const startedI = new Date(filtered[i].started_at as string).getTime();
-    for (let k = 0; k < i; k++) {
-      const startedK = new Date(filtered[k].started_at as string).getTime();
-      if (startedI < startedK) {
-        violations += 1;
+      const start = new Date(j.started_at).getTime();
+      const end = new Date(j.completed_at).getTime();
+      if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+        gpuHours += (j.gpu_count * (end - start)) / 1000 / 3600;
       }
     }
   }
-  return violations;
-}
 
-function computeJobsOverTime(jobs: JobRow[]): JobsOverTimePoint[] {
-  const buckets = new Map<string, number>();
-  for (const j of jobs) {
-    const date = j.created_at.slice(0, 10);
-    buckets.set(date, (buckets.get(date) ?? 0) + 1);
+  // Fairness violation: for each pair (a, b) where a.created_at < b.created_at
+  // but a.started_at > b.started_at, count `a` as violated (each job at most once).
+  const started = jobs.filter(
+    (j): j is JobRow & { started_at: string } => j.started_at !== null,
+  );
+  const violators = new Set<string>();
+  for (let i = 0; i < started.length; i++) {
+    const a = started[i];
+    const aCreated = new Date(a.created_at).getTime();
+    const aStarted = new Date(a.started_at).getTime();
+    for (let k = 0; k < started.length; k++) {
+      if (i === k) continue;
+      const b = started[k];
+      const bCreated = new Date(b.created_at).getTime();
+      const bStarted = new Date(b.started_at).getTime();
+      if (bCreated > aCreated && bStarted < aStarted) {
+        violators.add(a.id);
+        break;
+      }
+    }
   }
-  return Array.from(buckets.entries())
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([date, count]) => ({ date, count }));
-}
 
-function computeMetrics(jobs: JobRow[]): UserMetrics {
-  const total = jobs.length;
-  const successes = jobs.filter((j) => j.state === 'SUCCESS').length;
   return {
-    total_jobs: total,
-    success_rate: total === 0 ? 0 : successes / total,
-    gpu_hours: computeGpuHours(jobs),
-    fairness_violations: computeFairnessViolations(jobs),
+    totalJobs: total,
+    successRate,
+    gpuHours,
+    fairnessViolations: violators.size,
   };
 }
 
-function formatIsoDate(iso: string | null): string {
-  if (iso === null) return '—';
-  return new Date(iso).toISOString().replace('T', ' ').slice(0, 19) + 'Z';
+function bucketJobsByDay(jobs: JobRow[]): JobsOverTimePoint[] {
+  const counts = new Map<string, number>();
+  for (const j of jobs) {
+    const day = j.created_at.slice(0, 10); // YYYY-MM-DD
+    counts.set(day, (counts.get(day) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
-function MetricCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="border border-gray-200 rounded p-4 bg-white">
-      <div className="text-xs uppercase tracking-wide text-gray-500">
-        {label}
-      </div>
-      <div className="mt-1 text-2xl font-semibold text-gray-900">{value}</div>
-    </div>
-  );
+function fmtDate(value: string | null): string {
+  if (value === null) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toISOString().replace('T', ' ').slice(0, 19) + 'Z';
+}
+
+function fmtPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function fmtHours(value: number): string {
+  return value.toFixed(2);
 }
 
 export default async function UserDetailPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ sort?: string }>;
+  params: Promise<Params>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { id } = await params;
-  const { sort: sortParam } = await searchParams;
-  const sort: SortOrder = sortParam === 'asc' ? 'asc' : 'desc';
+  const sp = await searchParams;
+  const sort = parseSort(sp.sort);
 
-  const supabase = getServerSupabase();
+  const supabase = createServerClient();
 
-  const { data: userData } = await supabase
+  const { data: userRowRaw } = await supabase
     .from('users')
-    .select('id,email')
+    .select('id, email')
     .eq('id', id)
-    .maybeSingle<UserRow>();
+    .maybeSingle();
+  const userRow = userRowRaw as UserRow | null;
 
-  if (!userData) {
+  if (userRow === null) {
     return (
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          User not found
-        </h2>
-        <p className="text-gray-500">No user with id {id}.</p>
-      </div>
+      <main className="p-6">
+        <Breadcrumb
+          items={[
+            { href: '/', label: 'Users' },
+            { label: id },
+          ]}
+        />
+        <h1 className="mt-4 text-2xl font-semibold">User not found</h1>
+        <p className="mt-2 text-sm text-gray-600">
+          No user exists with id <code>{id}</code>.
+        </p>
+      </main>
     );
   }
 
-  const { data: jobsData } = await supabase
+  const { data: jobsRaw } = await supabase
     .from('jobs')
     .select(
-      'id,kind,state,display_name,gpu_count,created_at,started_at,completed_at',
+      'id, kind, state, display_name, gpu_count, created_at, started_at, completed_at',
     )
-    .eq('user_id', id)
-    .order('created_at', { ascending: false })
-    .returns<JobRow[]>();
+    .eq('user_id', id);
 
-  const jobs: JobRow[] = jobsData ?? [];
+  const jobs: JobRow[] = (jobsRaw ?? []) as JobRow[];
 
   const metrics = computeMetrics(jobs);
-  const overTime = computeJobsOverTime(jobs);
+  const overTime = bucketJobsByDay(jobs);
 
-  const sortedJobs = jobs.slice().sort((a, b) => {
+  const sortedJobs = [...jobs].sort((a, b) => {
     const ta = new Date(a.created_at).getTime();
     const tb = new Date(b.created_at).getTime();
     return sort === 'asc' ? ta - tb : tb - ta;
   });
 
-  const heading = userData.email ?? userData.id;
-  const successPct = (metrics.success_rate * 100).toFixed(1) + '%';
-
-  const sortLinkBase =
-    'px-3 py-1 rounded text-sm border transition-colors';
-  const activeCls = 'bg-blue-600 text-white border-blue-600';
-  const inactiveCls =
-    'bg-white text-gray-700 border-gray-300 hover:bg-gray-50';
+  const toggleSort: SortOrder = sort === 'asc' ? 'desc' : 'asc';
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">{heading}</h2>
-        {userData.email !== null && (
-          <p className="text-xs text-gray-500 mt-0.5">id: {userData.id}</p>
-        )}
-      </div>
+    <main className="p-6 space-y-6">
+      <Breadcrumb
+        items={[
+          { href: '/', label: 'Users' },
+          { label: userRow.email },
+        ]}
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MetricCard label="Total Jobs" value={metrics.total_jobs} />
-        <MetricCard label="Success Rate" value={successPct} />
-        <MetricCard label="GPU-Hours" value={metrics.gpu_hours.toFixed(1)} />
+      <header>
+        <h1 className="text-2xl font-semibold">{userRow.email}</h1>
+        <p className="text-xs text-gray-500">User id: {userRow.id}</p>
+      </header>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard label="Total Jobs" value={String(metrics.totalJobs)} />
+        <MetricCard label="Success Rate" value={fmtPercent(metrics.successRate)} />
+        <MetricCard label="GPU-Hours" value={fmtHours(metrics.gpuHours)} />
         <MetricCard
           label="Fairness Violations"
-          value={metrics.fairness_violations}
+          value={String(metrics.fairnessViolations)}
         />
-      </div>
+      </section>
 
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900">Job history</h3>
-          <div className="flex gap-2">
-            <Link
-              href={`/users/${id}?sort=asc`}
-              className={`${sortLinkBase} ${
-                sort === 'asc' ? activeCls : inactiveCls
-              }`}
-            >
-              Oldest first
-            </Link>
-            <Link
-              href={`/users/${id}?sort=desc`}
-              className={`${sortLinkBase} ${
-                sort === 'desc' ? activeCls : inactiveCls
-              }`}
-            >
-              Newest first
-            </Link>
-          </div>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">Job history</h2>
+          <Link
+            href={`/users/${userRow.id}?sort=${toggleSort}`}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Sort by created_at: {sort} (toggle)
+          </Link>
         </div>
 
-        {sortedJobs.length === 0 ? (
-          <div className="text-center text-gray-500 py-12 border border-gray-200 rounded">
-            No jobs for this user
-          </div>
-        ) : (
-          <div className="overflow-x-auto border border-gray-200 rounded">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded border border-gray-200">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 text-left">
+              <tr>
+                <th className="px-3 py-2 font-medium">Display Name</th>
+                <th className="px-3 py-2 font-medium">Kind</th>
+                <th className="px-3 py-2 font-medium">State</th>
+                <th className="px-3 py-2 font-medium">GPU</th>
+                <th className="px-3 py-2 font-medium">Created</th>
+                <th className="px-3 py-2 font-medium">Started</th>
+                <th className="px-3 py-2 font-medium">Completed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedJobs.length === 0 ? (
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-700">
-                    Display Name
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-700">
-                    Kind
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-700">
-                    State
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-700">
-                    GPU
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-700">
-                    Created
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-700">
-                    Started
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-700">
-                    Completed
-                  </th>
+                  <td
+                    colSpan={7}
+                    className="px-3 py-4 text-center text-gray-500"
+                  >
+                    No jobs for this user.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {sortedJobs.map((job, idx) => {
-                  const name = job.display_name ?? job.id.slice(0, 8);
-                  const zebra = idx % 2 === 1 ? 'bg-gray-50' : 'bg-white';
-                  return (
-                    <tr key={job.id} className={zebra}>
-                      <td className="px-3 py-2 text-gray-900">{name}</td>
-                      <td className="px-3 py-2 text-gray-700">{job.kind}</td>
-                      <td className="px-3 py-2">
-                        <StateBadge state={job.state} />
-                      </td>
-                      <td className="px-3 py-2 text-gray-700">
-                        {job.gpu_count}
-                      </td>
-                      <td className="px-3 py-2 text-gray-700">
-                        {humanizeAge(job.created_at)}
-                      </td>
-                      <td className="px-3 py-2 text-gray-700">
-                        {formatIsoDate(job.started_at)}
-                      </td>
-                      <td className="px-3 py-2 text-gray-700">
-                        {formatIsoDate(job.completed_at)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              ) : (
+                sortedJobs.map((j) => (
+                  <tr key={j.id} className="border-t border-gray-100">
+                    <td className="px-3 py-2">
+                      <Link
+                        href={`/jobs/${j.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {j.display_name ?? j.id.slice(0, 8)}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2">{j.kind}</td>
+                    <td className="px-3 py-2">{j.state}</td>
+                    <td className="px-3 py-2">{j.gpu_count}</td>
+                    <td className="px-3 py-2">{fmtDate(j.created_at)}</td>
+                    <td className="px-3 py-2">{fmtDate(j.started_at)}</td>
+                    <td className="px-3 py-2">{fmtDate(j.completed_at)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">
-          Jobs over time
-        </h3>
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Jobs over time</h2>
         <JobsOverTimeChart data={overTime} />
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
-// Force this page to render on every request so SUPABASE_SERVICE_ROLE_KEY
-// can be picked up at runtime and metrics stay fresh.
-export const dynamic = 'force-dynamic';
-
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-gray-200 bg-white p-4">
+      <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="mt-1 text-2xl font-semibold">{value}</div>
+    </div>
+  );
+}
