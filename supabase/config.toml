@@ -58,8 +58,9 @@ enabled = true
 schema_paths = []
 
 [db.seed]
+# set enabled=true temporarily ONLY for local supabase db reset; never commit with enabled=true
 # If enabled, seeds the database after migrations during a db reset.
-enabled = true
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]
