@@ -4,11 +4,11 @@ import { StateBadge } from '@/components/StateBadge';
 import type { JobState } from '@/lib/types';
 
 const CASES: Array<{ state: JobState; cls: string }> = [
-  { state: 'QUEUED', cls: 'bg-gray-100' },
-  { state: 'PROGRESS', cls: 'bg-blue-100' },
-  { state: 'SUCCESS', cls: 'bg-green-100' },
-  { state: 'FAIL', cls: 'bg-red-100' },
-  { state: 'CANCELLED', cls: 'bg-yellow-100' },
+  { state: 'QUEUED', cls: 'text-synapse-warn' },
+  { state: 'PROGRESS', cls: 'text-synapse-accent' },
+  { state: 'SUCCESS', cls: 'text-synapse-ok' },
+  { state: 'FAIL', cls: 'text-synapse-bad' },
+  { state: 'CANCELLED', cls: 'text-synapse-idle' },
 ];
 
 describe('StateBadge', () => {

@@ -1,1 +1,42 @@
-@import 'tailwindcss';
+@import "tailwindcss";
+
+@theme {
+  --color-synapse-bg: #0a0e11;
+  --color-synapse-bg-elev: #13161a;
+  --color-synapse-bg-hover: #1c2024;
+  --color-synapse-fg: #f8f8f8;
+  --color-synapse-fg-muted: #9a9fa5;
+  --color-synapse-fg-subtle: #6d7277;
+  --color-synapse-border: #23272b;
+  --color-synapse-border-strong: #373b40;
+  --color-synapse-accent: #00a1c8;
+  --color-synapse-accent-light: #00ccf9;
+  --color-synapse-ok: #67bb6b;
+  --color-synapse-warn: #f3ae58;
+  --color-synapse-bad: #f04c5a;
+  --color-synapse-idle: #86909b;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background-color: #0a0e11;
+  color: #f8f8f8;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #373b40 transparent;
+}
+
+*:focus-visible {
+  outline: 2px solid #00a1c8;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

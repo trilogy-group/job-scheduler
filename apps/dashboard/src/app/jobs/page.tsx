@@ -35,9 +35,9 @@ export default async function JobsPage() {
   });
 
   return (
-    <main className="p-4">
-      <h1 className="text-2xl font-bold mb-4">All Jobs</h1>
-      {error && <p className="text-red-600 mb-2">Error loading jobs: {error.message}</p>}
+    <main className="min-h-screen bg-synapse-bg p-6 space-y-4">
+      <h1 className="text-2xl font-semibold tracking-tight text-synapse-fg">All Jobs</h1>
+      {error && <p className="text-synapse-bad mb-2">Error loading jobs: {error.message}</p>}
       <JobsTable jobs={jobs} />
     </main>
   );

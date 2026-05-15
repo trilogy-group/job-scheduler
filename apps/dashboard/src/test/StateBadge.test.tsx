@@ -13,41 +13,41 @@ describe('StateBadge', () => {
     });
   }
 
-  it('applies state-specific class for QUEUED', () => {
+  it('applies text-synapse-warn class for QUEUED', () => {
     const { container } = render(<StateBadge state="QUEUED" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-gray-100/);
+    expect(span?.className).toMatch(/text-synapse-warn/);
   });
 
-  it('applies state-specific class for SUCCESS', () => {
+  it('applies text-synapse-ok class for SUCCESS', () => {
     const { container } = render(<StateBadge state="SUCCESS" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-green-100/);
+    expect(span?.className).toMatch(/text-synapse-ok/);
   });
 
-  it('applies state-specific class for FAIL', () => {
+  it('applies text-synapse-bad class for FAIL', () => {
     const { container } = render(<StateBadge state="FAIL" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-red-100/);
+    expect(span?.className).toMatch(/text-synapse-bad/);
   });
 
-  it('applies state-specific class for PROGRESS', () => {
+  it('applies text-synapse-accent class for PROGRESS', () => {
     const { container } = render(<StateBadge state="PROGRESS" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-blue-100/);
+    expect(span?.className).toMatch(/text-synapse-accent/);
   });
 
-  it('applies state-specific class for CANCELLED', () => {
+  it('applies text-synapse-idle class for CANCELLED', () => {
     const { container } = render(<StateBadge state="CANCELLED" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-yellow-100/);
+    expect(span?.className).toMatch(/text-synapse-idle/);
   });
 
-  it('falls back to gray for unknown state', () => {
+  it('falls back to text-synapse-idle for unknown state', () => {
     const { container } = render(
       <StateBadge state={'UNKNOWN' as unknown as JobState} />,
     );
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-gray-100/);
+    expect(span?.className).toMatch(/text-synapse-idle/);
   });
 });

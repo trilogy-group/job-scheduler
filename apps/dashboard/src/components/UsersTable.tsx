@@ -27,36 +27,52 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
           name="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="border rounded px-3 py-1.5 text-sm w-56"
+          className="rounded-full bg-synapse-bg-elev border border-synapse-border text-synapse-fg placeholder:text-synapse-fg-subtle px-4 py-1.5 text-sm w-56 focus:border-synapse-accent focus:outline-none"
         />
-        <span className="text-xs text-gray-500">{filtered.length} users</span>
+        <span className="text-xs text-synapse-fg-muted">
+          {filtered.length} users
+        </span>
       </div>
       {filtered.length === 0 ? (
-        <div className="text-center text-gray-500 py-12">No users found.</div>
+        <div className="text-center text-synapse-fg-muted py-12">
+          No users found.
+        </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto border border-synapse-border rounded-lg">
+          <table className="min-w-full divide-y divide-synapse-border text-sm">
+            <thead className="bg-synapse-bg-elev sticky top-0">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Email</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Jobs</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Success %</th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-gray-700">GPU-hrs</th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-gray-700">Issues</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Joined</th>
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-synapse-fg-muted">Email</th>
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-synapse-fg-muted">Jobs</th>
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-synapse-fg-muted">Success %</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-synapse-fg-muted">GPU-hrs</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-synapse-fg-muted">Issues</th>
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-synapse-fg-muted">Joined</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((u, idx) => (
-                <tr key={u.id} className={idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}>
-                  <td className="px-3 py-2 text-gray-900">{u.email}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.job_count}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.success_rate}%</td>
-                  <td className="hidden sm:table-cell px-3 py-2 text-gray-700">{u.gpu_hours}</td>
-                  <td className="hidden sm:table-cell px-3 py-2 text-gray-700">{u.issues}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.created_at.slice(0, 10)}</td>
-                </tr>
-              ))}
+            <tbody className="divide-y divide-synapse-border">
+              {filtered.map((u, idx) => {
+                const zebra = idx % 2 === 1 ? 'bg-synapse-bg-elev' : 'bg-synapse-bg';
+                return (
+                  <tr
+                    key={u.id}
+                    className={`${zebra} hover:bg-synapse-bg-hover transition-colors`}
+                  >
+                    <td className="px-3 py-2 text-synapse-fg">{u.email}</td>
+                    <td className="px-3 py-2 text-synapse-fg-muted">{u.job_count}</td>
+                    <td className="px-3 py-2 text-synapse-fg-muted">{u.success_rate}%</td>
+                    <td className="hidden sm:table-cell px-3 py-2 text-synapse-fg-muted">
+                      {u.gpu_hours}
+                    </td>
+                    <td className="hidden sm:table-cell px-3 py-2 text-synapse-fg-muted">
+                      {u.issues}
+                    </td>
+                    <td className="px-3 py-2 text-synapse-fg-subtle">
+                      {u.created_at.slice(0, 10)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

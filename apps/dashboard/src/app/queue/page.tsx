@@ -39,8 +39,8 @@ export default async function QueuePage() {
   }
 
   return (
-    <main className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Active Queue</h1>
+    <main className="min-h-screen bg-synapse-bg p-6 space-y-4">
+      <h1 className="text-2xl font-semibold tracking-tight text-synapse-fg">Active Queue</h1>
       <QueueTable jobs={jobs} />
     </main>
   );
