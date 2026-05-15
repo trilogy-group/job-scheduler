@@ -35,10 +35,16 @@ export default async function JobsPage() {
   });
 
   return (
-    <main className="p-4">
-      <h1 className="text-2xl font-bold mb-4">All Jobs</h1>
-      {error && <p className="text-red-600 mb-2">Error loading jobs: {error.message}</p>}
+    <div className="space-y-4">
+      <h1 className="text-xl font-semibold tracking-tight mb-4" style={{ color: 'var(--fg)' }}>
+        All Jobs
+      </h1>
+      {error && (
+        <p className="text-sm" style={{ color: 'var(--color-bad)' }}>
+          Error loading jobs: {error.message}
+        </p>
+      )}
       <JobsTable jobs={jobs} />
-    </main>
+    </div>
   );
 }

@@ -3,21 +3,22 @@ import { render, screen } from '@testing-library/react';
 import { StateBadge } from '@/components/StateBadge';
 import type { JobState } from '@/lib/types';
 
-const CASES: Array<{ state: JobState; cls: string }> = [
-  { state: 'QUEUED', cls: 'bg-gray-100' },
-  { state: 'PROGRESS', cls: 'bg-blue-100' },
-  { state: 'SUCCESS', cls: 'bg-green-100' },
-  { state: 'FAIL', cls: 'bg-red-100' },
-  { state: 'CANCELLED', cls: 'bg-yellow-100' },
+/* Synapse semantic color hex values used in StateBadge */
+const CASES: Array<{ state: JobState; hex: string }> = [
+  { state: 'QUEUED',    hex: '86909b' },
+  { state: 'PROGRESS',  hex: '00a1c8' },
+  { state: 'SUCCESS',   hex: '67bb6b' },
+  { state: 'FAIL',      hex: 'f04c5a' },
+  { state: 'CANCELLED', hex: '6d7277' },
 ];
 
 describe('StateBadge', () => {
-  for (const { state, cls } of CASES) {
-    it(`renders ${state} with ${cls}`, () => {
+  for (const { state, hex } of CASES) {
+    it(`renders ${state} with Synapse ${hex} token`, () => {
       render(<StateBadge state={state} />);
       const el = screen.getByText(state);
       expect(el).toBeInTheDocument();
-      expect(el.className).toContain(cls);
+      expect(el.className).toContain(hex);
     });
   }
 });
