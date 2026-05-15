@@ -2,10 +2,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { QueueTable } from "@/components/QueueTable";
 import type { JobEnriched } from "@/lib/types";
 
-// Static rendering (default; no export const). The Amplify WEB_COMPUTE
-// build server has SUPABASE_SERVICE_ROLE_KEY; the SSR Lambda runtime does
-// not. Data is embedded at build time and refreshed on each Amplify deploy.
-// TODO: expose service key to Lambda runtime and switch to force-dynamic.
+export const dynamic = 'force-dynamic';
 
 export default async function QueuePage() {
   const supabase = createServerClient();
@@ -13,7 +10,7 @@ export default async function QueuePage() {
     .from("jobs")
     .select("*, users(email)")
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(500);
 
   const jobs: JobEnriched[] = ((data ?? []) as Array<Record<string, unknown>>).map((row) => {
     const usersField = row.users as { email?: string } | null;
@@ -44,7 +41,7 @@ export default async function QueuePage() {
 
   return (
     <main className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Active Queue — REGRESSION-MARKER-20260515</h1>
+      <h1 className="text-2xl font-semibold">Active Queue</h1>
       <QueueTable jobs={jobs} />
     </main>
   );
