@@ -1,283 +1,326 @@
-# Synapse Design System Tokens
-*Extracted 2026-05-15 from https://synapse.ti.trilogy.com/_next/static/chunks/02853lmmwkngd.css (public CSS bundle, no auth required). The /projects dashboard is SSO-gated but the login page and all static assets are publicly accessible.*
+# Synapse Design System
 
-## Typography
+Extracted from public CSS bundle (https://synapse.ti.trilogy.com/_next/static/chunks/02853lmmwkngd.css) on 2026-05-15. No SSO auth required — bundle is publicly accessible.
 
-### Font Stacks
-```css
---font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
---font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, "Cascadia Mono", Consolas, monospace;
-```
-Font features: `"ss01", "cv11"` (OpenType stylistic alternates)
-Body: `-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale`
+## Source
 
-### Type Scale (Tailwind v4 CSS vars)
-| Token | rem | px |
-|---|---|---|
-| `--text-xs` | 0.75rem | 12px |
-| `--text-sm` | 0.875rem | 14px |
-| `--text-base` | 1rem | 16px |
-| `--text-lg` | 1.125rem | 18px |
-| `--text-xl` | 1.25rem | 20px |
-| `--text-2xl` | 1.5rem | 24px |
-| `--text-3xl` | 1.875rem | 30px |
-| `--text-4xl` | 2.25rem | 36px |
-| `--text-5xl` | 3rem | 48px |
-| `--text-6xl` | 3.75rem | 60px |
-| `--text-7xl` | 4.5rem | 72px |
-
-Custom sizes in use: 9px, 10px, 11px, 12px, 12.5px, 13px, 14px, 15px, 17px, 26px, 7.5rem
-
-### Font Weights
-| Token | Value |
-|---|---|
-| `--font-weight-normal` | 400 |
-| `--font-weight-medium` | 500 |
-| `--font-weight-semibold` | 600 |
-| `--font-weight-bold` | 700 |
-
-### Letter Spacing
-| Token | Value |
-|---|---|
-| `--tracking-tighter` | -0.05em |
-| `--tracking-tight` | -0.025em |
-| `--tracking-wider` | 0.05em |
-| `--tracking-widest` | 0.1em |
-
-Custom tracking in use: 0.15em, 0.18em, 0.2em
-
-Heading pattern: `font-semibold tracking-tight` (weight 600, -0.025em spacing)
-
-### Line Heights
-| Token | Value |
-|---|---|
-| `--leading-tight` | 1.25 |
-| `--leading-snug` | 1.375 |
-| (base) | 1.5 |
-| `--leading-relaxed` | 1.625 |
-
-Custom line heights: 0.95, 1.05, 1.25, 1 (leading-none)
+- CSS bundle: `/_next/static/chunks/02853lmmwkngd.css` (full Tailwind 4 output + custom layer)
+- Product description: `/llms.txt`
+- Landing page HTML (no auth): `https://synapse.ti.trilogy.com/`
 
 ---
 
 ## Color Tokens
 
-### Brand / Accent (Cyan/Teal)
-| Token | Hex | Description |
+### Global (mode-agnostic)
+
+| Token | Value (hex) | Usage |
 |---|---|---|
-| `--color-accent-300` | `#00ccf9` | Bright cyan (light accent, highlights) |
-| `--color-accent-500` | `#00a1c8` | Primary accent (buttons, focus ring, active states) |
+| `--color-accent-300` | `#00ccf9` | Light cyan — progress bars, highlights |
+| `--color-accent-500` | `#00a1c8` | Primary cyan/teal — CTAs, active states, focus rings |
+| `--color-ok` | `#67bb6b` | Green — success, healthy, passing |
+| `--color-warn` | `#f3ae58` | Amber — warning, in-progress, degraded |
+| `--color-bad` | `#f04c5a` | Red — error, failed, critical |
+| `--color-idle` | `#86909b` | Slate gray — idle, inactive, disabled states |
 
-### Status / Semantic Colors
-| Token | Hex | Description |
+### Dark Mode (default — no media query needed)
+
+| Token | Value (hex) | Lab equivalent |
 |---|---|---|
-| `--color-ok` | `#67bb6b` | Green — success, completed |
-| `--color-warn` | `#f3ae58` | Amber — warning |
-| `--color-bad` | `#f04c5a` | Red — error, failed |
-| `--color-idle` | `#86909b` | Gray — idle, neutral, queued |
+| `--bg` | `#0a0e11` | lab(3.69% -.55 -2.33) — page background |
+| `--bg-elev` | `#13161a` | lab(7.21% -.90 -3.47) — cards, panels, elevated surfaces |
+| `--bg-hover` | `#1c2024` | lab(11.83% -1.00 -3.52) — hover state, progress track bg |
+| `--fg` | `#f8f8f8` | lab(97.68%) — primary text |
+| `--fg-muted` | `#9a9fa5` | lab(65.19%) — secondary text, nav links |
+| `--fg-subtle` | `#6d7277` | lab(47.79%) — placeholder text, disabled, metadata |
+| `--border` | `#23272b` | lab(15.31%) — default borders |
+| `--border-strong` | `#373b40` | lab(24.59%) — hover borders, scrollbar track |
 
-*Note: `--color-bad-soft`, `--color-ok-soft`, `--color-warn-soft`, `--color-info`, `--color-info-soft` are referenced in component-level CSS (not in global bundle). Infer as 10–15% opacity overlays of their base color.*
+### Light Mode (`prefers-color-scheme: light`)
 
-### Semantic Surface Tokens — Dark Mode (default, `color-scheme: dark`)
-| Token | Hex | Lab | Description |
-|---|---|---|---|
-| `--bg` | `#0a0e11` | lab(3.69%) | Page background |
-| `--bg-elev` | `#13161a` | lab(7.21%) | Elevated surface (cards, panels) |
-| `--bg-hover` | `#1c2024` | lab(11.83%) | Hover state background |
-| `--fg` | `#f8f8f8` | lab(97.68%) | Primary text |
-| `--fg-muted` | `#9a9fa5` | lab(65.19%) | Secondary / muted text |
-| `--fg-subtle` | `#6d7277` | lab(47.79%) | Tertiary / placeholder text |
-| `--border` | `#23272b` | lab(15.31%) | Default border |
-| `--border-strong` | `#373b40` | lab(24.59%) | Stronger border (inputs, dividers) |
-
-### Semantic Surface Tokens — Light Mode (`prefers-color-scheme: light`)
-| Token | Hex | Description |
-|---|---|---|
-| `--bg` | `#fcfcfc` | Page background |
-| `--bg-elev` | `#f5f5f5` | Elevated surface |
-| `--bg-hover` | `#eeeeee` | Hover state |
-| `--fg` | `#0e1216` | Primary text |
-| `--fg-muted` | `#44484d` | Secondary / muted |
-| `--fg-subtle` | `#6d7277` | Tertiary (same both modes) |
-| `--border` | `#d9dfe5` | Default border |
-| `--border-strong` | `#bfc5ca` | Stronger border |
-
-**Default is dark mode.** Synapse is a dark-first product.
-
----
-
-## Spacing
-
-Base unit: `--spacing: 0.25rem` (4px). All Tailwind spacing multiplies this.
-
-Common spacings in use:
-- 0.5 (2px), 1 (4px), 1.5 (6px), 2 (8px), 2.5 (10px), 3 (12px), 4 (16px), 5 (20px), 6 (24px), 7 (28px), 8 (32px), 10 (40px), 12 (48px), 14 (56px), 16 (64px), 20 (80px), 24 (96px), 28 (112px)
-
----
-
-## Border Radius
-
-| Token | Value | px |
-|---|---|---|
-| `--radius-sm` | 0.25rem | 4px |
-| `--radius-md` | 0.375rem | 6px |
-| `--radius-lg` | 0.5rem | 8px |
-| `--radius-xl` | 0.75rem | 12px |
-| `--radius-2xl` | 1rem | 16px |
-| `rounded-full` | 3.4e38px | Circle |
-| `rounded-[1px]` | 1px | Near-square badge |
-
-Button pattern: `rounded-xl` (12px)
-Card pattern: `rounded-2xl` (16px) or `rounded-xl`
-Tag/badge: `rounded-full` or `rounded`
-
----
-
-## Transitions & Animation
-
-| Token | Value |
+| Token | Value (hex) |
 |---|---|
-| `--default-transition-duration` | 0.15s |
-| `--default-transition-timing-function` | cubic-bezier(0.4, 0, 0.2, 1) |
-| `--ease-out` | cubic-bezier(0, 0, 0.2, 1) |
-| `--animate-pulse` | pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite |
+| `--bg` | `#fcfcfc` |
+| `--bg-elev` | `#f5f5f5` |
+| `--bg-hover` | `#eeeeee` |
+| `--fg` | `#0e1216` |
+| `--fg-muted` | `#44484d` |
+| `--fg-subtle` | `#6d7277` (same as dark) |
+| `--border` | `#d9dfe5` |
+| `--border-strong` | `#bfc5ca` |
 
-`.reveal` pattern: `opacity: 0 + translateY(16px)` → `opacity: 1 + translateY(0)` over 0.7s `cubic-bezier(.2,.7,.2,1)`. Used for page enter animations.
+### Semantic Soft Variants (used in CSS via `var()`, likely defined in JS/global CSS not in bundle)
+
+These are referenced in the bundle but not defined there — likely injected via Tailwind config or a global CSS file:
+- `--accent` — maps to `--color-accent-500` behavior (border, bg, text usage identical)
+- `--color-bad-soft` — soft red background tint
+- `--color-ok-soft` — soft green background tint
+- `--color-warn-soft` — soft amber background tint
+- `--color-info` — informational blue (distinct from accent)
+- `--color-info-soft` — soft info background
+- `--text`, `--text-muted` — text color aliases (used alongside `--fg`)
 
 ---
 
-## Shadow
+## Typography
+
+### Font Stacks
+
+```
+--font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif
+--font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, "Cascadia Mono", Consolas, monospace
+```
+
+**Font features** (applied to `html, body`): `"ss01", "cv11"` — Inter stylistic set 1 (alternate digits) + character variant 11.  
+**Font smoothing**: `antialiased` (webkit + moz).
+
+### Type Scale
+
+| Token | rem | px equiv | Line height |
+|---|---|---|---|
+| `text-xs` | 0.75rem | 12px | 1.333 |
+| `text-sm` | 0.875rem | 14px | 1.429 |
+| `text-base` | 1rem | 16px | 1.5 |
+| `text-lg` | 1.125rem | 18px | 1.556 |
+| `text-xl` | 1.25rem | 20px | 1.4 |
+| `text-2xl` | 1.5rem | 24px | 1.333 |
+| `text-3xl` | 1.875rem | 30px | 1.2 |
+| `text-4xl` | 2.25rem | 36px | 1.111 |
+| `text-5xl` | 3rem | 48px | 1 |
+| `text-6xl` | 3.75rem | 60px | 1 |
+| `text-7xl` | 4.5rem | 72px | 1 |
+
+Custom sizes observed in components: `9px`, `10px`, `11px`, `12px`, `12.5px`, `13px`, `14px`, `15px`, `17px`, `26px`, `2.6rem`, `7.5rem`.
+
+### Font Weights
+
+| Class | Weight |
+|---|---|
+| `font-normal` | 400 |
+| `font-medium` | 500 |
+| `font-semibold` | 600 |
+| `font-bold` | 700 |
+
+### Letter Spacing
+
+| Class | Value | Use case |
+|---|---|---|
+| `tracking-tighter` | -0.05em | Hero headlines |
+| `tracking-tight` | -0.025em | Section headers |
+| `tracking-wider` | 0.05em | Labels |
+| `tracking-widest` | 0.1em | ALL CAPS metadata |
+| custom `[0.15em]` | 0.15em | Tag chips |
+| custom `[0.18em]` | 0.18em | Tag chips |
+| custom `[0.2em]` | 0.2em | Tag chips |
+
+### Line Heights
 
 | Class | Value |
 |---|---|
-| `.shadow-sm` | `0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.1)` |
-| `.shadow-md` | `0 4px 6px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.1)` |
-| `.shadow-lg` | `0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.1)` |
-| `.shadow-2xl` | `0 25px 50px rgba(0,0,0,0.25)` |
-| `.card-shadow` | `0 1px rgba(0,0,0,0.04), 0 4px 24px -8px rgba(0,0,0,0.12)` |
-
-`card-shadow` is Synapse's custom card elevation — very subtle, lab-space aware.
-
----
-
-## Focus / Accessibility
-
-Focus ring: `outline: 2px solid var(--color-accent-500); outline-offset: 2px; border-radius: 4px`
-Scrollbars: `scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent`
-Reduced-motion: `.reveal` animations disabled via `@media (prefers-reduced-motion: reduce)`
+| `leading-tight` | 1.25 |
+| `leading-snug` | 1.375 |
+| `leading-relaxed` | 1.625 |
+| `leading-none` | 1 |
+| `leading-[0.95]` | 0.95 (tight hero) |
+| `leading-[1.05]` | 1.05 |
+| `leading-[1.25]` | 1.25 |
 
 ---
 
-## Component Patterns (inferred from Tailwind classes in DOM)
+## Spacing Scale
 
-### Buttons
-```css
-/* Primary / Outlined (login button pattern) */
-rounded-xl px-4 py-3 text-sm font-medium
-border border-[var(--border-strong)]
-bg-[var(--bg-elev)] hover:bg-[var(--bg-hover)]
-transition-colors disabled:opacity-60
-```
+Base unit: **0.25rem (4px)** — standard Tailwind 4 scale.
 
-### Status Pills (scheduler-relevant)
-Based on `--color-*` tokens, each state should map to:
-| Scheduler State | Color Token | Background (6%) | Border (30%) |
-|---|---|---|---|
-| QUEUED | `--color-idle` `#86909b` | `rgba(134,144,155,0.06)` | `rgba(134,144,155,0.3)` |
-| PROGRESS | `--color-accent-500` `#00a1c8` | `rgba(0,161,200,0.06)` | `rgba(0,161,200,0.3)` |
-| COMPLETED | `--color-ok` `#67bb6b` | `rgba(103,187,107,0.06)` | `rgba(103,187,107,0.3)` |
-| FAILED | `--color-bad` `#f04c5a` | `rgba(240,76,90,0.06)` | `rgba(240,76,90,0.3)` |
-| CANCELLED | `--fg-subtle` `#6d7277` | `rgba(109,114,119,0.06)` | `rgba(109,114,119,0.3)` |
-
-PROGRESS state should use `animate-pulse` on the dot indicator.
-
-### Logo / Brand Mark
-```html
-<!-- Synapse logo: 8px cyan dot + semibold tracking-tight text -->
-<span class="block size-2 rounded-full bg-[var(--color-accent-500)]"></span>
-<span class="font-semibold tracking-tight text-lg">Synapse</span>
-```
-
-### Typography Hierarchy
-- Page H1: `text-2xl font-semibold tracking-tight` (24px, 600, -0.025em)
-- Section H2: `text-xl font-semibold tracking-tight` (20px, 600)
-- Body: `text-sm` (14px, 400, line-height 1.43)
-- Muted body: `text-sm text-[var(--fg-muted)]`
-- Caption / meta: `text-xs text-[var(--fg-subtle)]`
-- Label / uppercase: `text-xs tracking-widest uppercase` (tracking 0.1em)
-- Monospace (job IDs, counts): `font-mono tabular`
-
-### Cards
-```css
-rounded-xl bg-[var(--bg-elev)] card-shadow border border-[var(--border)]
-```
-
-### Input / Search
-```css
-bg-[var(--bg-elev)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm
-placeholder:text-[var(--fg-subtle)]
-focus:border-[var(--border-strong)] focus:outline-none
-transition-colors
-```
-
-### Table
-- Header: `text-xs font-medium tracking-wider text-[var(--fg-subtle)] uppercase`
-- Row: `border-b border-[var(--border)] hover:bg-[var(--bg-hover)]`
-- Cell: `text-sm text-[var(--fg)]` (default), `text-[var(--fg-muted)]` (secondary columns)
-- Monospace cells (IDs, hashes): `font-mono text-xs tabular`
-
-### Navigation
-- Synapse uses a sidebar nav (operator dashboard). Nav items: `text-sm font-medium text-[var(--fg-muted)] hover:text-[var(--fg)]`
-- Active item: `text-[var(--fg)] bg-[var(--bg-hover)]` with left accent `border-l-2 border-[var(--color-accent-500)]`
+Common component spacings observed:
+- Component padding: `p-3` (12px), `p-4` (16px), `p-5` (20px), `p-6` (24px), `p-8` (32px)
+- Card internal: `p-6 md:p-7` (24px → 28px)
+- Nav item: `px-3 py-1.5` (12px × 6px)
+- Input: `px-4 py-3` (16px × 12px)
+- Tag/pill: `px-2 py-0.5` (8px × 2px)
+- Section vertical: `py-16` → `py-32` → `py-40`
 
 ---
 
-## Container / Layout
+## Border Radii
 
-Max widths:
-| Token | rem | px |
+| Token | Value | Usage |
 |---|---|---|
-| xs | 20rem | 320px |
-| sm | 24rem | 384px |
-| md | 28rem | 448px |
-| lg | 32rem | 512px |
-| xl | 36rem | 576px |
-| 2xl | 42rem | 672px |
-| 3xl | 48rem | 768px |
-| 4xl | 56rem | 896px |
-| 5xl | 64rem | 1024px |
-| 6xl | 72rem | 1152px |
-| 7xl | 80rem | 1280px |
-
-App uses `max-w-[1200px]` and `max-w-[1600px]` for wide layouts.
-
-Breakpoints (Tailwind defaults): sm 640px, md 768px, lg 1024px
+| `rounded-sm` / `--radius-sm` | 0.25rem (4px) | Tags, small chips |
+| `rounded-md` / `--radius-md` | 0.375rem (6px) | Buttons, badges |
+| `rounded-lg` / `--radius-lg` | 0.5rem (8px) | Inputs, small cards |
+| `rounded-xl` / `--radius-xl` | 0.75rem (12px) | Modal dialogs |
+| `rounded-2xl` / `--radius-2xl` | 1rem (16px) | **Primary card radius** |
+| `rounded-full` | 9999px | Pills, avatar badges, inputs |
+| `rounded-[1px]` | 1px | Progress bar fill |
 
 ---
 
-## Dark/Light Mode Strategy
+## Shadows
 
-Synapse defaults to **dark mode** (`color-scheme: dark` on `:root`). All semantic tokens (`--bg`, `--fg`, `--border`, etc.) are dark by default and override to light values under `@media (prefers-color-scheme: light)`. There is no manual theme toggle visible in the public CSS — it follows OS preference.
-
-**Implication for job-scheduler dashboard**: Match this pattern — dark-first, `prefers-color-scheme: light` override, no manual toggle (or add one later as enhancement).
-
----
-
-## Implications for `apps/dashboard/`
-
-1. **Color tokens**: Add CSS variables matching Synapse's semantic set to `apps/dashboard/app/globals.css`. Use the same token names for familiarity (`--bg`, `--bg-elev`, `--fg`, `--fg-muted`, `--border`, etc.).
-2. **Accent**: `--color-accent-500: #00a1c8` (cyan). Replace any hardcoded blues/indigos.
-3. **Status pills**: Use the status → color mapping table above. Add `animate-pulse` dot on PROGRESS jobs.
-4. **Typography**: Ensure Inter is loaded (it's in the font stack). Apply `font-feature-settings: "ss01", "cv11"` on the body.
-5. **Card style**: `rounded-xl bg-[var(--bg-elev)] card-shadow border border-[var(--border)]` — replace any existing card classes.
-6. **Dark-first**: flip the dashboard default to dark; let OS light preference override.
-7. **Table headers**: `text-xs uppercase tracking-wider text-[var(--fg-subtle)]` — Synapse's table header style.
-8. **Focus ring**: Ensure `outline: 2px solid var(--color-accent-500); outline-offset: 2px` on all interactive elements.
+| Class | Value | Usage |
+|---|---|---|
+| `card-shadow` (custom) | `0 1px rgba(0,0,0,0.04), 0 4px 24px -8px rgba(0,0,0,0.12)` | Card component shadow |
+| `shadow-sm` | `0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1)` | Tag chips, pills |
+| `shadow-md` | `0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)` | Hover elevation |
+| `shadow-lg` | `0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)` | Dropdowns, popovers |
+| `shadow-2xl` | `0 25px 50px -12px rgba(0,0,0,0.25)` | Modals |
+| `shadow-black/40` | Black at 40% opacity | Used with `shadow-2xl` on hero images |
 
 ---
 
-## Source
-- CSS bundle: `https://synapse.ti.trilogy.com/_next/static/chunks/02853lmmwkngd.css`
-- HTML source: `https://synapse.ti.trilogy.com/login` (public login page)
-- llms.txt: `https://synapse.ti.trilogy.com/llms.txt`
-- Extracted: 2026-05-15T14:54Z by job-scheduler-wt-lint (job-scheduler-a86)
+## Motion / Animation
+
+### Default Transition
+```
+transition-duration: 0.15s
+transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
+```
+
+### Easing Presets
+| Token | Value |
+|---|---|
+| `--ease-out` | `cubic-bezier(0, 0, 0.2, 1)` |
+| default ease | `cubic-bezier(0.4, 0, 0.2, 1)` |
+
+### Named Animations
+| Name | Value | Usage |
+|---|---|---|
+| `animate-pulse` | `pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite` | Skeleton loaders |
+| `reveal / reveal-in` (custom) | opacity 0→1 + translateY(16px→0), 0.7s `cubic-bezier(0.2, 0.7, 0.2, 1)` | Page entrance animation |
+
+Reduced motion: `reveal` is reset to `opacity:1; transition:none; transform:none` when `prefers-reduced-motion: reduce`.
+
+### Duration Overrides
+- `duration-200`: 0.2s
+- `duration-300`: 0.3s
+
+---
+
+## Blur Tokens
+
+| Token | Value |
+|---|---|
+| `--blur-md` | 12px |
+| `--blur-xl` | 24px |
+| `backdrop-blur` | 8px |
+| `backdrop-blur-[2px]` | 2px |
+
+---
+
+## Component Patterns (from landing page HTML)
+
+### Card
+```html
+<div class="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]
+            p-6 md:p-7 hover:border-[var(--border-strong)] transition-colors">
+  <!-- card content -->
+</div>
+```
+
+### Text Input (rounded, full-width)
+```html
+<input class="flex-1 px-4 py-3 rounded-full border border-[var(--border)] bg-[var(--bg-elev)]
+             text-sm placeholder:text-[var(--fg-subtle)] focus:border-[var(--color-accent-500)]
+             focus:outline-none transition-colors" />
+```
+
+### Tag Chip (muted)
+```html
+<span class="px-2 py-0.5 rounded-full text-[10px] font-medium border border-[var(--border)]
+            bg-[var(--bg)] text-[var(--fg-muted)] shadow-sm">
+  tag
+</span>
+```
+
+### Tag Chip (accent)
+```html
+<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border border-[var(--color-accent-500)]
+            bg-[var(--bg)] text-[var(--color-accent-500)] tabular tracking-wider">
+  ACTIVE
+</span>
+```
+
+### Nav Link
+```html
+<a class="hidden sm:inline-flex items-center px-3 py-1.5 text-sm text-[var(--fg-muted)]
+          hover:text-[var(--fg)] transition-colors">
+  Link
+</a>
+```
+
+### Status Dot
+```html
+<span class="block size-2 rounded-full bg-[var(--color-accent-500)]
+            group-hover:scale-110 transition-transform"></span>
+```
+
+### Progress Bar
+```html
+<div class="flex-1 h-1 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+  <div class="h-full bg-[var(--color-accent-500)]"></div>
+</div>
+```
+
+### Inline-grid card header (used for stat cards)
+```html
+<div class="flex items-baseline gap-2 mb-3">
+  <span class="text-2xl font-bold tracking-tight">42</span>
+  <span class="text-sm text-[var(--fg-muted)]">label</span>
+</div>
+```
+
+### Expand/collapse section (animated)
+```html
+<!-- Collapsed -->
+<div class="grid transition-all duration-300 ease-out grid-rows-[0fr] opacity-0">
+  <div class="overflow-hidden"><!-- content --></div>
+</div>
+<!-- Expanded -->
+<div class="grid transition-all duration-300 ease-out grid-rows-[1fr] opacity-100">
+  <div class="overflow-hidden"><!-- content --></div>
+</div>
+```
+
+---
+
+## Grid Breakpoints (Tailwind 4 defaults)
+
+| Prefix | Min-width |
+|---|---|
+| `sm:` | 40rem (640px) |
+| `md:` | 48rem (768px) |
+| `lg:` | 64rem (1024px) |
+
+Page max-widths observed: `max-w-[1200px]`, `max-w-[1600px]`, `max-w-7xl` (80rem).
+
+---
+
+## Color Scheme
+
+- **Default**: **dark mode** (no media query — `:root` directly sets dark vars)
+- **Light mode**: via `@media (prefers-color-scheme: light)`
+- **Scheme declaration**: `color-scheme: dark` on `:root`
+
+---
+
+## Special Utilities
+
+- `.tabular`: `font-variant-numeric: tabular-nums` — applied to numeric counters, stats, timing values
+- `.mono`: `font-family: var(--font-mono)` — code blocks, IDs
+- `.reveal` / `.reveal-in`: entrance animation (translateY + fade, 0.7s)
+- `.card-shadow`: custom layered shadow for cards
+- Scrollbar: `scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent` (applied to `*`)
+- Focus: `outline: 2px solid var(--color-accent-500); outline-offset: 2px; border-radius: 4px` on `:focus-visible`
+
+---
+
+## Implications for apps/dashboard Redesign
+
+1. **Dark-first**: Apply dark mode as default, light via media query — matches Synapse exactly.
+2. **Accent**: Replace any existing brand color with `--color-accent-500: #00a1c8` as primary interactive color.
+3. **Card pattern**: Use `rounded-2xl + border + bg-[var(--bg-elev)] + p-6` for all data cards.
+4. **Status pills**: Jobs in PROGRESS → `--color-ok` chip; QUEUED → `--color-warn` chip; FAILED → `--color-bad` chip; IDLE → `--color-idle` chip.
+5. **Typography**: Adopt Inter with `ss01, cv11` feature settings; use `tracking-tight` on headers, `tabular` on numeric columns.
+6. **Inputs**: Adopt rounded-full pill input pattern for search, rounded-lg for forms.
+7. **Animations**: Add `reveal/reveal-in` entrance animation to data sections; use 0.15s default transitions.
+8. **Progress**: Use 1px h-1 rounded-full track + accent fill for GPU utilization bars.
