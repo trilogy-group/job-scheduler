@@ -60,37 +60,12 @@ export default async function UsersPage() {
     };
   });
 
-  const totalUsers = usersWithStats.length;
-  const totalJobs = usersWithStats.reduce((sum, u) => sum + u.job_count, 0);
-  const totalGpuHours = Math.round(
-    usersWithStats.reduce((sum, u) => sum + u.gpu_hours, 0) * 10,
-  ) / 10;
-  const activeUsers = usersWithStats.filter((u) => u.job_count > 0).length;
-
   return (
-    <main className="p-6 space-y-4 max-w-[1600px] mx-auto">
-      <h1 className="text-2xl font-semibold tracking-tight text-[var(--fg)]">Users</h1>
+    <main className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Users</h1>
       {usersRes.error && (
-        <p className="text-[var(--color-bad)] text-sm">Error: {usersRes.error.message}</p>
+        <p className="text-red-600 mb-2">Error: {usersRes.error.message}</p>
       )}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <div className="bg-[var(--bg-elev)] border border-[var(--border)] rounded-xl p-4 shadow-[var(--card-shadow)]">
-          <div className="text-xs uppercase tracking-wider text-[var(--fg-subtle)]">Total users</div>
-          <div className="text-2xl font-semibold tracking-tight text-[var(--fg)] font-mono tabular-nums mt-1">{totalUsers}</div>
-        </div>
-        <div className="bg-[var(--bg-elev)] border border-[var(--border)] rounded-xl p-4 shadow-[var(--card-shadow)]">
-          <div className="text-xs uppercase tracking-wider text-[var(--fg-subtle)]">Active</div>
-          <div className="text-2xl font-semibold tracking-tight text-[var(--fg)] font-mono tabular-nums mt-1">{activeUsers}</div>
-        </div>
-        <div className="bg-[var(--bg-elev)] border border-[var(--border)] rounded-xl p-4 shadow-[var(--card-shadow)]">
-          <div className="text-xs uppercase tracking-wider text-[var(--fg-subtle)]">Total jobs</div>
-          <div className="text-2xl font-semibold tracking-tight text-[var(--fg)] font-mono tabular-nums mt-1">{totalJobs}</div>
-        </div>
-        <div className="bg-[var(--bg-elev)] border border-[var(--border)] rounded-xl p-4 shadow-[var(--card-shadow)]">
-          <div className="text-xs uppercase tracking-wider text-[var(--fg-subtle)]">GPU-hours</div>
-          <div className="text-2xl font-semibold tracking-tight text-[var(--fg)] font-mono tabular-nums mt-1">{totalGpuHours}</div>
-        </div>
-      </div>
       <UsersTable users={usersWithStats} />
     </main>
   );

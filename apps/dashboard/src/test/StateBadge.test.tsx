@@ -13,41 +13,41 @@ describe('StateBadge', () => {
     });
   }
 
-  it('applies a style class for QUEUED (idle color)', () => {
+  it('applies state-specific class for QUEUED', () => {
     const { container } = render(<StateBadge state="QUEUED" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/86909b/);
+    expect(span?.className).toContain('color-warn');
   });
 
-  it('applies a style class for SUCCESS (ok color)', () => {
+  it('applies state-specific class for SUCCESS', () => {
     const { container } = render(<StateBadge state="SUCCESS" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/67bb6b/);
+    expect(span?.className).toContain('color-ok');
   });
 
-  it('applies a style class for FAIL (bad color)', () => {
+  it('applies state-specific class for FAIL', () => {
     const { container } = render(<StateBadge state="FAIL" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/f04c5a/);
+    expect(span?.className).toContain('color-bad');
   });
 
-  it('applies a style class for PROGRESS (accent color)', () => {
+  it('applies state-specific class for PROGRESS', () => {
     const { container } = render(<StateBadge state="PROGRESS" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/00a1c8/);
+    expect(span?.className).toContain('color-accent-500');
   });
 
-  it('applies a style class for CANCELLED', () => {
+  it('applies state-specific class for CANCELLED', () => {
     const { container } = render(<StateBadge state="CANCELLED" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/6d7277/);
+    expect(span?.className).toContain('color-idle');
   });
 
-  it('falls back gracefully for unknown state', () => {
+  it('falls back to idle color for unknown state', () => {
     const { container } = render(
       <StateBadge state={'UNKNOWN' as unknown as JobState} />,
     );
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/86909b/);
+    expect(span?.className).toContain('color-idle');
   });
 });
