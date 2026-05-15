@@ -1,7 +1,6 @@
 import { createServerClient } from "@/lib/supabase-server";
 import { UsersTable } from "@/components/UsersTable";
 
-export const dynamic = 'force-dynamic';
 
 interface UserWithStats {
   id: string;
