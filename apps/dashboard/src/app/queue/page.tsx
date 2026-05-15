@@ -2,7 +2,10 @@ import { createServerClient } from "@/lib/supabase-server";
 import { QueueTable } from "@/components/QueueTable";
 import type { JobEnriched } from "@/lib/types";
 
-export const dynamic = 'force-dynamic';
+// Revalidate on every deploy; Next.js build-time fetch picks up live DB data.
+// Do NOT use force-dynamic here — Amplify WEB_COMPUTE SSR Lambda lacks
+// server-only env vars (SUPABASE_SERVICE_ROLE_KEY) at request time.
+export const revalidate = 0;
 
 export default async function QueuePage() {
   const supabase = createServerClient();
