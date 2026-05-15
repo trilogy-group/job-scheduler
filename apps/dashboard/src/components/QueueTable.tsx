@@ -9,9 +9,9 @@ const ALL_STATES = ['QUEUED', 'PROGRESS', 'SUCCESS', 'FAIL', 'CANCELLED'] as con
 
 const FILTER_ACTIVE_STYLES: Record<string, string> = {
   QUEUED:
-    'border-[var(--color-warn)] text-[var(--color-warn)] bg-[var(--bg-elev)] opacity-100',
+    'border-[var(--color-idle)] text-[var(--color-idle)] bg-[var(--bg-elev)] opacity-100',
   PROGRESS:
-    'border-[var(--color-accent-500)] text-[var(--color-accent-500)] bg-[var(--bg-elev)] opacity-100',
+    'border-[var(--color-warn)] text-[var(--color-warn)] bg-[var(--bg-elev)] opacity-100',
   SUCCESS:
     'border-[var(--color-ok)] text-[var(--color-ok)] bg-[var(--bg-elev)] opacity-100',
   FAIL:
@@ -125,7 +125,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                   >
                     <td className="px-3 py-2 text-[var(--fg-muted)]">
                       {job.state === 'PROGRESS' ? (
-                        <span className="text-[var(--color-accent-500)]">▶</span>
+                        <span className="text-[var(--color-warn)]">▶</span>
                       ) : isQueued && queuedPos !== undefined ? (
                         <span className="inline-flex items-center justify-center size-5 rounded-full bg-[var(--color-accent-500)]/10 text-[var(--color-accent-500)] text-xs font-semibold tabular-nums">
                           {queuedPos}
