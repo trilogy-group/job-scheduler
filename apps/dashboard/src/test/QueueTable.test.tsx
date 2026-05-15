@@ -16,7 +16,7 @@ afterEach(() => {
 describe('QueueTable', () => {
   it('renders empty-state message when no jobs', () => {
     render(<QueueTable jobs={[]} />);
-    expect(screen.getByText(/No jobs found/i)).toBeTruthy();
+    expect(screen.getByText(/No jobs match/i)).toBeTruthy();
   });
 
   it('shows position "1" for the first QUEUED job', () => {

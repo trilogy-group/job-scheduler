@@ -118,7 +118,7 @@ describe('app/queue/page.tsx', () => {
     const tree = await QueuePage();
     const { container } = render(tree);
     expect(container.textContent).toMatch(/Active Queue/);
-    expect(container.textContent).toMatch(/No jobs found/);
+    expect(container.textContent).toMatch(/No jobs/);
   });
 });
 

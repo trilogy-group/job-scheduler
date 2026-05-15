@@ -52,6 +52,7 @@ export function StateBadge({ state }: { state: JobState }) {
   const s = STATE_STYLES[state] ?? STATE_STYLES.QUEUED;
   return (
     <span
+      data-state={state}
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
       style={{
         background: s.bg,

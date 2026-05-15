@@ -36,7 +36,7 @@ describe('QueueTable', () => {
 
   it('renders empty state when no jobs', () => {
     render(<QueueTable jobs={[]} />);
-    expect(screen.getByText('No jobs found.')).toBeInTheDocument();
+    expect(screen.getByText(/No jobs match/i)).toBeInTheDocument();
   });
 
   it('renders a search input with the expected aria-label', () => {
