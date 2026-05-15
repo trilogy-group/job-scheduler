@@ -8,7 +8,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
   if (jobs.length === 0) {
     return (
       <div className="text-center text-gray-500 py-12">
-        No jobs in queue or progress
+        No jobs found.
       </div>
     );
   }
