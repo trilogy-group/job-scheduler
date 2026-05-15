@@ -4,9 +4,9 @@ import type { JobState } from '@/lib/types';
 
 const STATE_STYLES: Record<JobState, string> = {
   QUEUED:
-    'border border-[var(--color-warn)] text-[var(--color-warn)] bg-[var(--bg-elev)]',
+    'border border-[var(--color-idle)] text-[var(--color-idle)] bg-[var(--bg-elev)]',
   PROGRESS:
-    'border border-[var(--color-accent-500)] text-[var(--color-accent-500)] bg-[var(--bg-elev)]',
+    'border border-[var(--color-warn)] text-[var(--color-warn)] bg-[var(--bg-elev)]',
   SUCCESS:
     'border border-[var(--color-ok)] text-[var(--color-ok)] bg-[var(--bg-elev)]',
   FAIL:
