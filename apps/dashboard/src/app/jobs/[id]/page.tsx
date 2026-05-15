@@ -30,9 +30,9 @@ export default async function JobDetailPage({
             { label: id },
           ]}
         />
-        <h1 className="text-2xl font-semibold">Job not found</h1>
+        <h1 className="text-2xl font-semibold">Job {id}</h1>
         <p className="text-sm text-gray-600">
-          No job exists with id <code>{id}</code>.
+          No job found with id <code>{id}</code>.
         </p>
       </main>
     );

@@ -12,7 +12,7 @@ export default async function QueuePage() {
   const jobs: JobEnriched[] = (data ?? []) as JobEnriched[];
   return (
     <main className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Active Queue</h1>
+      <h1 className="text-2xl font-semibold">Queue</h1>
       <QueueTable jobs={jobs} />
     </main>
   );

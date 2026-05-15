@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 
 const FAKE_USER_ID = '00000000-0000-0000-0000-000000000001';
 const FAKE_JOB_ID = '00000000-0000-0000-0000-000000000abc';
+const REAL_JOB_ID = 'a0000001-0000-0000-0000-000000000001';
 
 async function assertNoHorizontalOverflow(page: Page, label: string) {
   // Allow 1px rounding tolerance.
@@ -99,6 +100,12 @@ test.describe('/jobs/[id]', () => {
       `/jobs/${FAKE_JOB_ID}`,
       new RegExp(`^Job ${FAKE_JOB_ID}$`),
     );
+  });
+});
+
+test.describe('/jobs/[real-id] (happy path with seed data)', () => {
+  test('functional + a11y + keyboard + responsive', async ({ page }) => {
+    await runRouteChecks(page, `/jobs/${REAL_JOB_ID}`, /^alice-shakespeare-sft-rev1$/);
   });
 });
 
