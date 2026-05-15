@@ -39,19 +39,13 @@ describe('QueueTable', () => {
     expect(screen.getByText('No jobs found.')).toBeInTheDocument();
   });
 
-  it('renders a search input with the expected aria-label', () => {
-    render(<QueueTable jobs={[makeJob()]} />);
-    expect(screen.getByLabelText('search jobs')).toBeInTheDocument();
-  });
-
   it('renders a single QUEUED job with display_name, email, kind, gpus', () => {
     render(<QueueTable jobs={[makeJob()]} />);
     expect(screen.getByText('test-job')).toBeInTheDocument();
     expect(screen.getByText('alice@example.com')).toBeInTheDocument();
     expect(screen.getByText('SFT')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
-    // QUEUED appears in both the filter chip and the row badge.
-    expect(screen.getAllByText('QUEUED').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('QUEUED')).toBeInTheDocument();
     // age: 90s → 1m
     expect(screen.getByText('1m')).toBeInTheDocument();
   });
