@@ -61,12 +61,16 @@ export default async function UsersPage() {
   });
 
   return (
-    <main className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Users</h1>
+    <div className="space-y-4">
+      <h1 className="text-xl font-semibold tracking-tight mb-4" style={{ color: 'var(--fg)' }}>
+        Users
+      </h1>
       {usersRes.error && (
-        <p className="text-red-600 mb-2">Error: {usersRes.error.message}</p>
+        <p className="text-sm" style={{ color: 'var(--color-bad)' }}>
+          Error: {usersRes.error.message}
+        </p>
       )}
       <UsersTable users={usersWithStats} />
-    </main>
+    </div>
   );
 }
