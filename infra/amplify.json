@@ -1,0 +1,11 @@
+{
+  "appId": "d2y6yvvlxvd81b",
+  "appName": "job-scheduler-dashboard",
+  "defaultDomain": "https://d2y6yvvlxvd81b.amplifyapp.com",
+  "repository": "https://github.com/trilogy-group/job-scheduler",
+  "platform": "WEB_COMPUTE",
+  "region": "us-east-1",
+  "branch": "main",
+  "cloneMethod": "SSH",
+  "provisionedAt": "2026-05-15"
+}
