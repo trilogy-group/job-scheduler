@@ -2,10 +2,10 @@ import { createServerClient } from "@/lib/supabase-server";
 import { QueueTable } from "@/components/QueueTable";
 import type { JobEnriched } from "@/lib/types";
 
-// Revalidate on every deploy; Next.js build-time fetch picks up live DB data.
-// Do NOT use force-dynamic here — Amplify WEB_COMPUTE SSR Lambda lacks
-// server-only env vars (SUPABASE_SERVICE_ROLE_KEY) at request time.
-export const revalidate = 0;
+// Static rendering (default; no export const). The Amplify WEB_COMPUTE
+// build server has SUPABASE_SERVICE_ROLE_KEY; the SSR Lambda runtime does
+// not. Data is embedded at build time and refreshed on each Amplify deploy.
+// TODO: expose service key to Lambda runtime and switch to force-dynamic.
 
 export default async function QueuePage() {
   const supabase = createServerClient();
