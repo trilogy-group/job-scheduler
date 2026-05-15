@@ -45,7 +45,7 @@ describe('QueueTable', () => {
     expect(screen.getByText('alice@example.com')).toBeInTheDocument();
     expect(screen.getByText('SFT')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('QUEUED')).toBeInTheDocument();
+    expect(screen.getAllByText('QUEUED').length).toBeGreaterThan(0);
     // age: 90s → 1m
     expect(screen.getByText('1m')).toBeInTheDocument();
   });

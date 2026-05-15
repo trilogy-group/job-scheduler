@@ -87,6 +87,7 @@ describe('QueueTable', () => {
         display_name: null,
         user_id: 'userxyzlonglong',
         user_email: null,
+        fireworks_job_name: null,
       }) as unknown as JobEnriched,
     ];
     render(<QueueTable jobs={jobs} />);
