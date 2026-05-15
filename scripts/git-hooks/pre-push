@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#
+# pre-push hook: enforce PR-only flow and prohibit force pushes.
+#
+# Git invokes this hook with one line per ref on stdin:
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+#
+# Rejection rules:
+#   1. Direct push to refs/heads/main is always rejected.
+#   2. Non-fast-forward (history rewrite / force push) is rejected.
+#
+# See CONTRIBUTING.md for the rationale.
+
+set -u
+
+ZERO_SHA="0000000000000000000000000000000000000000"
+rejected=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # Empty line guard (some Gits send a trailing blank).
+  if [ -z "${remote_ref:-}" ]; then
+    continue
+  fi
+
+  # Rule 1: direct push to main is forbidden.
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    cat <<'MSG'
+✗ Push rejected: direct push to refs/heads/main
+
+  Direct pushes to main are not permitted. All changes must go through
+  a pull request so CI can validate them.
+
+  What to do instead:
+    • git switch -c feature/<short-description>
+    • git push -u origin feature/<short-description>
+    • Open a PR against main on GitHub.
+
+  See CONTRIBUTING.md#pr-only-flow.
+MSG
+    rejected=1
+    continue
+  fi
+
+  # Rule 2: force-push detection.
+  # Skip new branches (remote_sha is zero) and branch deletes (local_sha is zero).
+  if [ "$remote_sha" != "$ZERO_SHA" ] && [ "$local_sha" != "$ZERO_SHA" ]; then
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      cat <<MSG
+✗ Push rejected: force push to ${remote_ref}
+
+  Force pushes (--force, --force-with-lease) are not permitted on this repo.
+  They rewrite remote history and can clobber parallel agent PRs.
+
+  What to do instead:
+    • Push to a NEW branch name (git push origin HEAD:feature/foo-v2) and open a new PR.
+    • To revert, use \`git revert <sha>\` and push the revert commit additively.
+
+  See CONTRIBUTING.md#no-force-push for the full rationale.
+  This hook lives at scripts/git-hooks/pre-push.
+MSG
+      rejected=1
+      continue
+    fi
+  fi
+done
+
+if [ "$rejected" -ne 0 ]; then
+  exit 1
+fi
+
+exit 0
