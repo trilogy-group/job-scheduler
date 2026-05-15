@@ -21,20 +21,6 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, "Cascadia Mono", Consolas, monospace;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: light;
-    --bg: #fcfcfc;
-    --bg-elev: #f5f5f5;
-    --bg-hover: #eeeeee;
-    --fg: #0e1216;
-    --fg-muted: #44484d;
-    --fg-subtle: #6d7277;
-    --border: #d9dfe5;
-    --border-strong: #bfc5ca;
-  }
-}
-
 *, *::before, *::after {
   box-sizing: border-box;
 }

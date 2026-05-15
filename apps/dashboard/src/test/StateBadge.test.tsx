@@ -16,7 +16,7 @@ describe('StateBadge', () => {
   it('applies state-specific class for QUEUED', () => {
     const { container } = render(<StateBadge state="QUEUED" />);
     const span = container.querySelector('span');
-    expect(span?.className).toContain('color-warn');
+    expect(span?.className).toContain('color-idle');
   });
 
   it('applies state-specific class for SUCCESS', () => {
@@ -34,7 +34,7 @@ describe('StateBadge', () => {
   it('applies state-specific class for PROGRESS', () => {
     const { container } = render(<StateBadge state="PROGRESS" />);
     const span = container.querySelector('span');
-    expect(span?.className).toContain('color-accent-500');
+    expect(span?.className).toContain('color-warn');
   });
 
   it('applies state-specific class for CANCELLED', () => {
