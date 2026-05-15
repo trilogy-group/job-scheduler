@@ -104,20 +104,20 @@ describe('app/layout.tsx', () => {
 // --- Queue page ---------------------------------------------------------
 
 describe('app/queue/page.tsx', () => {
-  it('renders Job Queue header and queue table on success', async () => {
+  it('renders Active Queue header and queue table on success', async () => {
     mockedFrom.mockReturnValue(chain({ data: [makeJob({ state: 'QUEUED' })], error: null }));
     const { default: QueuePage } = await import('@/app/queue/page');
     const tree = await QueuePage();
     const { container } = render(tree);
-    expect(container.textContent).toMatch(/Job Queue/);
+    expect(container.textContent).toMatch(/Active Queue/);
   });
 
-  it('renders Job Queue with empty table when fetch errors', async () => {
+  it('renders Active Queue with empty table when fetch errors', async () => {
     mockedFrom.mockReturnValue(chain({ data: null, error: new Error('down') }));
     const { default: QueuePage } = await import('@/app/queue/page');
     const tree = await QueuePage();
     const { container } = render(tree);
-    expect(container.textContent).toMatch(/Job Queue/);
+    expect(container.textContent).toMatch(/Active Queue/);
     expect(container.textContent).toMatch(/No jobs found/);
   });
 });
@@ -125,10 +125,12 @@ describe('app/queue/page.tsx', () => {
 // --- Jobs index page ----------------------------------------------------
 
 describe('app/jobs/page.tsx', () => {
-  it('redirects to /queue', async () => {
+  it('renders All Jobs header and jobs table on success', async () => {
+    mockedFrom.mockReturnValue(chain({ data: [makeJob({ state: 'SUCCESS' })], error: null }));
     const { default: JobsPage } = await import('@/app/jobs/page');
-    JobsPage();
-    expect(redirectMock).toHaveBeenCalledWith('/queue');
+    const tree = await JobsPage();
+    const { container } = render(tree);
+    expect(container.textContent).toMatch(/All Jobs/);
   });
 });
 
@@ -168,10 +170,20 @@ describe('app/jobs/[id]/page.tsx', () => {
 // --- Users index page ---------------------------------------------------
 
 describe('app/users/page.tsx', () => {
-  it('redirects to /queue', async () => {
+  it('renders Users header and users table on success', async () => {
+    mockedFrom.mockImplementation((table: string) => {
+      if (table === 'users') {
+        return chain({
+          data: [{ id: 'u-1', email: 'alice@x.com', created_at: '2026-05-01T10:00:00Z' }],
+          error: null,
+        });
+      }
+      return chain({ data: [], error: null });
+    });
     const { default: UsersPage } = await import('@/app/users/page');
-    UsersPage();
-    expect(redirectMock).toHaveBeenCalledWith('/queue');
+    const tree = await UsersPage();
+    const { container } = render(tree);
+    expect(container.textContent).toMatch(/Users/);
   });
 });
 

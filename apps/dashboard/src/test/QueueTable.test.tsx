@@ -85,6 +85,7 @@ describe('QueueTable', () => {
         id: 'abcdef12-0000-0000-0000-000000000000',
         state: 'QUEUED',
         display_name: null,
+        fireworks_job_name: null,
         user_id: 'userxyzlonglong',
         user_email: null,
       }) as unknown as JobEnriched,
