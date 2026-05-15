@@ -1,3 +1,24 @@
+-- ===========================================================================
+-- LOCAL DEV ONLY. THIS FILE MUST NEVER BE APPLIED TO PRODUCTION.
+-- The dashboard fixtures defined here are 5 synthetic users (alice/bob/carol/
+-- dave/eve) and 30 synthetic jobs. They will pollute the prod jobs/users
+-- tables if pushed. On 2026-05-15 this file leaked into prod via
+-- `supabase db push --linked --include-seed` against the prod project ref.
+-- Cleanup transaction is logged in drafts/prod-cleanup-full-backup.sql.
+-- ===========================================================================
+DO $$ BEGIN
+  IF inet_server_addr() IS NOT NULL AND
+     NOT (
+       inet_server_addr() <<= '127.0.0.0/8'::inet OR
+       inet_server_addr() <<= '10.0.0.0/8'::inet OR
+       inet_server_addr() <<= '172.16.0.0/12'::inet OR
+       inet_server_addr() <<= '192.168.0.0/16'::inet OR
+       inet_server_addr() = '::1'::inet
+     ) THEN
+    RAISE EXCEPTION 'seed.sql attempted on non-local host (%). Refusing. This file is LOCAL DEV ONLY.',
+      inet_server_addr()::text;
+  END IF;
+END $$;
 -- supabase/seed.sql
 -- ────────────────────────────────────────────────────────────────────
 -- Canonical local seed for the job-scheduler dashboard test fixtures.

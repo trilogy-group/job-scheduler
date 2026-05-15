@@ -2,6 +2,8 @@ import { createServerClient } from "@/lib/supabase-server";
 import { QueueTable } from "@/components/QueueTable";
 import type { JobEnriched } from "@/lib/types";
 
+export const dynamic = 'force-dynamic';
+
 export default async function QueuePage() {
   const supabase = createServerClient();
   const { data, error } = await supabase
