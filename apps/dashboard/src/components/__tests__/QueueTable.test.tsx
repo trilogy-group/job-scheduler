@@ -36,7 +36,7 @@ describe('QueueTable', () => {
 
   it('renders empty state when no jobs', () => {
     render(<QueueTable jobs={[]} />);
-    expect(screen.getByText('No jobs in queue or progress')).toBeInTheDocument();
+    expect(screen.getByText('No jobs found.')).toBeInTheDocument();
   });
 
   it('renders a single QUEUED job with display_name, email, kind, gpus', () => {
