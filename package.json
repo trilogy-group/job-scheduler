@@ -9,7 +9,8 @@
     "issue-key": "node scripts/issue_key.js",
     "revoke-key": "node scripts/revoke_key.js",
     "dump": "node scripts/dump_state.js",
-    "test": "node --experimental-strip-types --test tests/*.test.js"
+    "test": "node --experimental-strip-types --test tests/*.test.js",
+    "lint:md": "npx prettier --check \"**/*.md\" --ignore-path .gitignore"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -17,5 +18,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3"
   }
 }
