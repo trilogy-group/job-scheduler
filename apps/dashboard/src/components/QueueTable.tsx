@@ -32,7 +32,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
             <th className="px-3 py-2 text-left font-medium text-gray-700">Name</th>
             <th className="px-3 py-2 text-left font-medium text-gray-700">User</th>
             <th className="px-3 py-2 text-left font-medium text-gray-700">Kind</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-700">GPUs</th>
+            <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-gray-700">GPUs</th>
             <th className="px-3 py-2 text-left font-medium text-gray-700">State</th>
             <th className="px-3 py-2 text-left font-medium text-gray-700">Age</th>
           </tr>
@@ -50,7 +50,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                 <td className="px-3 py-2 text-gray-900">{name}</td>
                 <td className="px-3 py-2 text-gray-700">{user}</td>
                 <td className="px-3 py-2 text-gray-700">{job.kind}</td>
-                <td className="px-3 py-2 text-gray-700">{job.gpu_count}</td>
+                <td className="hidden sm:table-cell px-3 py-2 text-gray-700">{job.gpu_count}</td>
                 <td className="px-3 py-2">
                   <StateBadge state={job.state} />
                 </td>
