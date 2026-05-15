@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     passWithNoTests: true,
-    exclude: ['node_modules', '.next', 'tests/e2e/**/*'],
+    exclude: ['node_modules', '.next', 'tests/e2e/**/*', 'e2e/**/*'],
     coverage: {
       provider: 'v8',
       include: ['src/components/**', 'src/lib/**'],
