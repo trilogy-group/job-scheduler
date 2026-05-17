@@ -19,7 +19,7 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
 
   return (
     <div>
-      <div className="flex gap-2 mb-3 items-center">
+      <div className="flex gap-2 mb-4 items-center">
         <input
           type="search"
           placeholder="Search users…"
@@ -27,36 +27,50 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
           name="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="border rounded px-3 py-1.5 text-sm w-56"
+          style={{ background: 'var(--bg-elev)', borderColor: 'var(--border)', color: 'var(--fg)' }}
+          className="rounded-full border px-4 py-1.5 text-sm w-56 placeholder:text-[--fg-subtle] focus:outline-none focus:border-[--color-accent-500] transition-colors"
         />
-        <span className="text-xs text-gray-500">{filtered.length} users</span>
+        <span className="text-xs ml-auto" style={{ color: 'var(--fg-muted)' }}>{filtered.length} users</span>
       </div>
       {filtered.length === 0 ? (
-        <div className="text-center text-gray-500 py-12">No users found.</div>
+        <div className="text-center py-16 text-sm" style={{ color: 'var(--fg-subtle)' }}>No users found.</div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div
+          className="overflow-x-auto rounded-2xl border"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          <table className="min-w-full text-sm">
+            <thead
+              className="sticky top-0"
+              style={{ background: 'var(--bg-elev)', borderBottom: '1px solid var(--border)' }}
+            >
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Email</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Jobs</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Success %</th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-gray-700">GPU-hrs</th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left font-medium text-gray-700">Issues</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Joined</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider" style={{ color: 'var(--fg-muted)' }}>Email</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider" style={{ color: 'var(--fg-muted)' }}>Jobs</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider" style={{ color: 'var(--fg-muted)' }}>Success %</th>
+                <th className="hidden sm:table-cell px-3 py-2.5 text-left text-xs font-semibold tracking-wider" style={{ color: 'var(--fg-muted)' }}>GPU-hrs</th>
+                <th className="hidden sm:table-cell px-3 py-2.5 text-left text-xs font-semibold tracking-wider" style={{ color: 'var(--fg-muted)' }}>Issues</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider" style={{ color: 'var(--fg-muted)' }}>Joined</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((u, idx) => (
-                <tr key={u.id} className={idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}>
-                  <td className="px-3 py-2 text-gray-900">{u.email}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.job_count}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.success_rate}%</td>
-                  <td className="hidden sm:table-cell px-3 py-2 text-gray-700">{u.gpu_hours}</td>
-                  <td className="hidden sm:table-cell px-3 py-2 text-gray-700">{u.issues}</td>
-                  <td className="px-3 py-2 text-gray-700">{u.created_at.slice(0, 10)}</td>
-                </tr>
-              ))}
+            <tbody>
+              {filtered.map((u, idx) => {
+                const rowBg = idx % 2 === 1 ? 'var(--bg-elev)' : 'var(--bg)';
+                return (
+                  <tr
+                    key={u.id}
+                    style={{ backgroundColor: rowBg, borderBottom: '1px solid var(--border)' }}
+                    className="hover:bg-[--bg-hover] transition-colors"
+                  >
+                    <td className="px-3 py-2 font-medium" style={{ color: 'var(--fg)' }}>{u.email}</td>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--fg-muted)' }}>{u.job_count}</td>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--fg-muted)' }}>{u.success_rate}%</td>
+                    <td className="hidden sm:table-cell px-3 py-2 tabular-nums" style={{ color: 'var(--fg-muted)' }}>{u.gpu_hours}</td>
+                    <td className="hidden sm:table-cell px-3 py-2 tabular-nums" style={{ color: 'var(--fg-muted)' }}>{u.issues}</td>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--fg-subtle)' }}>{u.created_at.slice(0, 10)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

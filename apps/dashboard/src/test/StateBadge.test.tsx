@@ -16,38 +16,38 @@ describe('StateBadge', () => {
   it('applies state-specific class for QUEUED', () => {
     const { container } = render(<StateBadge state="QUEUED" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-gray-100/);
+    expect(span?.className).toContain('color-idle');
   });
 
   it('applies state-specific class for SUCCESS', () => {
     const { container } = render(<StateBadge state="SUCCESS" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-green-100/);
+    expect(span?.className).toContain('color-ok');
   });
 
   it('applies state-specific class for FAIL', () => {
     const { container } = render(<StateBadge state="FAIL" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-red-100/);
+    expect(span?.className).toContain('color-bad');
   });
 
   it('applies state-specific class for PROGRESS', () => {
     const { container } = render(<StateBadge state="PROGRESS" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-blue-100/);
+    expect(span?.className).toContain('color-warn');
   });
 
   it('applies state-specific class for CANCELLED', () => {
     const { container } = render(<StateBadge state="CANCELLED" />);
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-yellow-100/);
+    expect(span?.className).toContain('color-idle');
   });
 
-  it('falls back to gray for unknown state', () => {
+  it('falls back to idle color for unknown state', () => {
     const { container } = render(
       <StateBadge state={'UNKNOWN' as unknown as JobState} />,
     );
     const span = container.querySelector('span');
-    expect(span?.className).toMatch(/bg-gray-100/);
+    expect(span?.className).toContain('color-idle');
   });
 });

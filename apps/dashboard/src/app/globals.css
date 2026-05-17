@@ -1,1 +1,43 @@
 @import 'tailwindcss';
+
+:root {
+  color-scheme: dark;
+  --bg: #0a0e11;
+  --bg-elev: #13161a;
+  --bg-hover: #1c2024;
+  --fg: #f8f8f8;
+  --fg-muted: #9a9fa5;
+  /* WCAG 2.1 AA: #9aa0a6 yields 7.34:1 on --bg (#0a0e11) and 6.87:1 on --bg-elev (#13161a). */
+  --fg-subtle: #9aa0a6;
+  --border: #23272b;
+  --border-strong: #373b40;
+  --color-accent-300: #00ccf9;
+  --color-accent-500: #00a1c8;
+  --color-ok: #67bb6b;
+  --color-warn: #f3ae58;
+  --color-bad: #f04c5a;
+  --color-idle: #86909b;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, "Cascadia Mono", Consolas, monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
