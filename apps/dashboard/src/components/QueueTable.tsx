@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { JobEnriched } from '@/lib/types';
+import type { JobEnriched, JobKind } from '@/lib/types';
 import { StateBadge } from './StateBadge';
 import { JobModal } from './JobModal';
 import { humanizeAge } from '@/lib/time';
@@ -38,6 +38,14 @@ const FILTER_BASE =
 const FILTER_INACTIVE =
   'border-[var(--border)] bg-[var(--bg-elev)] text-[var(--fg-muted)] opacity-50';
 
+interface FireworksJobSummaryClient {
+  name: string;
+  kind: JobKind;
+  state: string;
+  created_at: string | null;
+  gpu_count: number | null;
+}
+
 export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -50,6 +58,52 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
     parseStateParam(searchParams?.get('state')),
   );
   const [selectedJob, setSelectedJob] = useState<JobEnriched | null>(null);
+  const [orphanRows, setOrphanRows] = useState<JobEnriched[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/fireworks-jobs');
+        if (!res.ok) return;
+        const body = (await res.json()) as { jobs?: FireworksJobSummaryClient[] };
+        const fwJobs = body.jobs ?? [];
+        const known = new Set(
+          jobs
+            .map((j) => j.fireworks_job_name)
+            .filter((n): n is string => Boolean(n)),
+        );
+        const orphans: JobEnriched[] = fwJobs
+          .filter((fw) => !known.has(fw.name))
+          .map((fw) => ({
+            id: fw.name,
+            user_id: 'fireworks',
+            kind: fw.kind,
+            state: 'PROGRESS',
+            display_name: fw.name.split('/').pop() ?? fw.name,
+            gpu_count: fw.gpu_count ?? 4,
+            fireworks_payload: null,
+            fireworks_job_name: fw.name,
+            error: null,
+            created_at: fw.created_at ?? new Date().toISOString(),
+            started_at: null,
+            completed_at: null,
+            user_email: null,
+            base_model: null,
+            output_model: null,
+            dataset: null,
+            failure_class: null,
+            is_orphan: true,
+          }));
+        if (!cancelled) setOrphanRows(orphans);
+      } catch {
+        // ignore — orphan poller is best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobs]);
 
   const syncUrl = useCallback(
     (nextQuery: string, nextStates: Set<string>) => {
@@ -90,7 +144,8 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
     syncUrl(query, next);
   }
 
-  const filteredRaw = jobs
+  const allJobs = [...jobs, ...orphanRows];
+  const filteredRaw = allJobs
     .filter((j) => activeStates.has(j.state))
     .filter((j) => {
       if (!query.trim()) return true;
