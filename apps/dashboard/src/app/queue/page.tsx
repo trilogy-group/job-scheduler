@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { createBrowserClient } from "@/lib/supabase-browser";
 import { QueueTable } from "@/components/QueueTable";
 import type { JobEnriched } from "@/lib/types";
@@ -61,9 +61,11 @@ export default function QueuePage() {
         Active Queue
       </h1>
       {jobs === null ? (
-        <div className="text-sm" style={{ color: 'var(--fg)' }}>Loading…</div>
+        <div className="py-12 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>Loading queue…</div>
       ) : (
-        <QueueTable jobs={jobs} />
+        <Suspense fallback={<div className="py-12 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>Loading queue…</div>}>
+          <QueueTable jobs={jobs} />
+        </Suspense>
       )}
     </div>
   );
