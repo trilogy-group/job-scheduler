@@ -33,7 +33,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
     });
   }
 
-  const filtered = jobs
+  const filteredRaw = jobs
     .filter((j) => activeStates.has(j.state))
     .filter((j) => {
       if (!query.trim()) return true;
@@ -43,10 +43,15 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
       return name.includes(q) || user.includes(q);
     });
 
-  // Compute 1-based positions among QUEUED jobs (ordered as filtered).
+  // Split into non-orphan and orphan groups, preserving relative order in each.
+  const nonOrphans = filteredRaw.filter((j) => !j.is_orphan);
+  const orphans = filteredRaw.filter((j) => j.is_orphan);
+  const filtered = [...nonOrphans, ...orphans];
+
+  // Compute 1-based positions among non-orphan QUEUED jobs only.
   const queuedOrder = new Map<string, number>();
   let pos = 0;
-  for (const j of filtered) {
+  for (const j of nonOrphans) {
     if (j.state === 'QUEUED') {
       pos += 1;
       queuedOrder.set(j.id, pos);
@@ -105,20 +110,34 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
             <tbody className="divide-y divide-[#23272b]">
               {filtered.map((job) => {
                 const positionLabel =
-                  job.state === 'PROGRESS' ? '▶' : String(queuedOrder.get(job.id) ?? '');
+                  job.state === 'PROGRESS'
+                    ? '▶'
+                    : job.is_orphan
+                      ? ''
+                      : String(queuedOrder.get(job.id) ?? '');
                 const name = job.display_name ?? job.fireworks_job_name ?? job.id.slice(0, 8);
                 const user = job.user_email ?? job.user_id.slice(0, 8);
                 const progressEdge =
                   job.state === 'PROGRESS' ? 'border-l-2 border-[#f3ae58]' : '';
+                const orphanEdge = job.is_orphan ? 'border-l-2 border-amber-400' : '';
                 return (
                   <tr
                     key={job.id}
-                    className={`bg-[#0a0e11] hover:bg-[#1c2024] transition-colors ${progressEdge}`}
+                    data-testid={job.is_orphan ? 'orphan-row' : undefined}
+                    title={job.is_orphan ? 'Started outside the queue' : undefined}
+                    className={`bg-[#0a0e11] hover:bg-[#1c2024] transition-colors ${progressEdge} ${orphanEdge}`}
                   >
                     <td className="px-3 py-2 text-[#9a9fa5] font-mono tabular-nums text-xs">
                       {positionLabel}
                     </td>
-                    <td className="px-3 py-2 text-[#f8f8f8]">{name}</td>
+                    <td className="px-3 py-2 text-[#f8f8f8]">
+                      {name}
+                      {job.is_orphan && (
+                        <span className="ml-2 text-xs font-medium px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-400/40">
+                          External
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-[#9a9fa5]">{user}</td>
                     <td className="px-3 py-2 text-[#9a9fa5]">{job.kind}</td>
                     <td className="hidden sm:table-cell px-3 py-2 text-[#9a9fa5]">

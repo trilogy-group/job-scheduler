@@ -31,6 +31,7 @@ export default async function QueuePage() {
       output_model: null,
       dataset: null,
       failure_class: null,
+      is_orphan: (row.is_orphan as boolean | null) ?? false,
     };
   });
 
