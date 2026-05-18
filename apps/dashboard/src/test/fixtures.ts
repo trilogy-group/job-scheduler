@@ -18,6 +18,7 @@ export interface MinimalJob {
   output_model: string | null;
   dataset: string | null;
   failure_class: string | null;
+  is_orphan: false;
 }
 
 export function makeJob(overrides: Partial<MinimalJob> = {}): MinimalJob {
@@ -39,6 +40,7 @@ export function makeJob(overrides: Partial<MinimalJob> = {}): MinimalJob {
     output_model: 'alice-sft-v1',
     dataset: 'ds-001',
     failure_class: null,
+    is_orphan: false,
     ...overrides,
   };
 }
