@@ -121,6 +121,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                 return (
                   <tr
                     key={job.id}
+                    data-state={job.state}
                     className={`${zebra} hover:bg-[var(--bg-hover)] transition-colors`}
                   >
                     <td className="px-3 py-2 text-[var(--fg-muted)]">
