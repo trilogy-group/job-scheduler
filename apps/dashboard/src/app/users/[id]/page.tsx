@@ -1,19 +1,14 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { StateBadge } from '@/components/StateBadge';
 import Breadcrumb from '@/components/layout/Breadcrumb';
 import JobsOverTimeChart, {
   type JobsOverTimePoint,
 } from '@/components/charts/JobsOverTimeChart';
-import { createServerClient } from '@/lib/supabase-server';
-
-export async function generateStaticParams() {
-  const supabase = createServerClient();
-  const { data } = await supabase.from('users').select('id');
-  return (data ?? []).map((u: { id: string }) => ({ id: u.id }));
-}
-
-type Params = { id: string };
-type SearchParams = { sort?: string };
+import { createBrowserClient } from '@/lib/supabase-browser';
 
 type JobState = 'QUEUED' | 'PROGRESS' | 'SUCCESS' | 'FAIL' | 'CANCELLED';
 type JobKind = 'SFT' | 'DPO' | 'RFT';
@@ -44,7 +39,7 @@ type Metrics = {
   fairnessViolations: number;
 };
 
-function parseSort(raw: string | undefined): SortOrder {
+function parseSort(raw: string | undefined | null): SortOrder {
   return raw === 'asc' ? 'asc' : 'desc';
 }
 
@@ -124,25 +119,62 @@ function fmtHours(value: number): string {
   return value.toFixed(2);
 }
 
-export default async function UserDetailPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<Params>;
-  searchParams: Promise<SearchParams>;
-}) {
-  const { id } = await params;
-  const sp = await searchParams;
-  const sort = parseSort(sp.sort);
+export default function UserDetailPage() {
+  const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const id = (params?.id ?? '') as string;
+  const sort = parseSort(searchParams?.get('sort') ?? undefined);
 
-  const supabase = createServerClient();
+  const [loading, setLoading] = useState<boolean>(true);
+  const [userRow, setUserRow] = useState<UserRow | null>(null);
+  const [jobs, setJobs] = useState<JobRow[]>([]);
 
-  const { data: userRowRaw } = await supabase
-    .from('users')
-    .select('id, email')
-    .eq('id', id)
-    .maybeSingle();
-  const userRow = userRowRaw as UserRow | null;
+  useEffect(() => {
+    if (!id) return;
+    const supabase = createBrowserClient();
+    let cancelled = false;
+
+    (async () => {
+      const { data: userRowRaw } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('id', id)
+        .maybeSingle();
+      const u = userRowRaw as UserRow | null;
+
+      if (cancelled) return;
+      setUserRow(u);
+
+      if (u === null) {
+        setJobs([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: jobsRaw } = await supabase
+        .from('jobs')
+        .select(
+          'id, kind, state, display_name, gpu_count, created_at, started_at, completed_at, is_orphan',
+        )
+        .eq('user_id', id);
+
+      if (cancelled) return;
+      setJobs((jobsRaw ?? []) as JobRow[]);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <main className="p-6">
+        <div className="text-sm text-gray-500">Loading…</div>
+      </main>
+    );
+  }
 
   if (userRow === null) {
     return (
@@ -160,15 +192,6 @@ export default async function UserDetailPage({
       </main>
     );
   }
-
-  const { data: jobsRaw } = await supabase
-    .from('jobs')
-    .select(
-      'id, kind, state, display_name, gpu_count, created_at, started_at, completed_at, is_orphan',
-    )
-    .eq('user_id', id);
-
-  const jobs: JobRow[] = (jobsRaw ?? []) as JobRow[];
 
   const metrics = computeMetrics(jobs);
   const overTime = bucketJobsByDay(jobs);

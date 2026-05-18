@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeJob } from './fixtures';
 
@@ -10,12 +10,24 @@ const notFoundMock = vi.fn(() => {
   throw new Error('NEXT_NOT_FOUND');
 });
 
+// Per-test holders for client-side hooks.
+let currentParams: Record<string, string> = {};
+let currentSearchParams: Record<string, string> = {};
+
 vi.mock('next/navigation', () => ({
   redirect: (...args: unknown[]) => redirectMock(...args),
   notFound: (...args: unknown[]) => notFoundMock(...args),
   usePathname: () => '/queue',
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useParams: () => currentParams,
+  useSearchParams: () => ({
+    get: (key: string) => currentSearchParams[key] ?? null,
+  }),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
 }));
 
 vi.mock('next/link', () => ({
@@ -40,10 +52,16 @@ vi.mock('@/lib/supabase', () => ({
   LOCAL_DEV_USER_ID: null,
 }));
 
-// Mock supabase-server so pages don't hit real Supabase
+// Mock supabase-server so anything that still imports it stays safe.
 const createServerClientMock = vi.fn();
 vi.mock('@/lib/supabase-server', () => ({
   createServerClient: (...args: unknown[]) => createServerClientMock(...args),
+}));
+
+// Mock supabase-browser — this is what the dashboard pages now use.
+const createBrowserClientMock = vi.fn();
+vi.mock('@/lib/supabase-browser', () => ({
+  createBrowserClient: (...args: unknown[]) => createBrowserClientMock(...args),
 }));
 
 // Mock the recharts-based chart so jsdom doesn't need ResizeObserver.
@@ -69,8 +87,11 @@ const mockedFrom = supabase.from as unknown as ReturnType<typeof vi.fn>;
 beforeEach(() => {
   mockedFrom.mockReset();
   createServerClientMock.mockReturnValue({ from: mockedFrom });
+  createBrowserClientMock.mockReturnValue({ from: mockedFrom });
   redirectMock.mockReset();
   notFoundMock.mockClear();
+  currentParams = {};
+  currentSearchParams = {};
 });
 
 // --- Root page (redirect) -----------------------------------------------
@@ -109,19 +130,17 @@ describe('app/queue/page.tsx', () => {
   it('renders Active Queue header and queue table on success', async () => {
     mockedFrom.mockReturnValue(chain({ data: [makeJob({ state: 'QUEUED' })], error: null }));
     const { default: QueuePage } = await import('@/app/queue/page');
-    const tree = await QueuePage();
-    const { container } = render(tree);
-    expect(container.textContent).toMatch(/Active Queue/);
+    render(<QueuePage />);
+    expect(await screen.findByText(/Active Queue/)).toBeTruthy();
   });
 
   it('renders Active Queue with empty table when fetch errors', async () => {
     mockedFrom.mockReturnValue(chain({ data: null, error: new Error('down') }));
     const { default: QueuePage } = await import('@/app/queue/page');
-    const tree = await QueuePage();
-    const { container } = render(tree);
+    const { container } = render(<QueuePage />);
     expect(container.textContent).toMatch(/Active Queue/);
-    // Queue page defaults to QUEUED+PROGRESS filter → contextual empty-state
-    expect(container.textContent).toMatch(/No active jobs/);
+    // With default QUEUED+PROGRESS filter, empty state shows 'No active jobs'
+    expect(await screen.findByText(/No active jobs/)).toBeTruthy();
   });
 });
 
@@ -131,9 +150,10 @@ describe('app/jobs/page.tsx', () => {
   it('renders All Jobs header and jobs table on success', async () => {
     mockedFrom.mockReturnValue(chain({ data: [makeJob({ state: 'SUCCESS' })], error: null }));
     const { default: JobsPage } = await import('@/app/jobs/page');
-    const tree = await JobsPage();
-    const { container } = render(tree);
+    const { container } = render(<JobsPage />);
     expect(container.textContent).toMatch(/All Jobs/);
+    // wait a tick for state update to settle
+    await screen.findByText(/All Jobs/);
   });
 });
 
@@ -184,9 +204,8 @@ describe('app/users/page.tsx', () => {
       return chain({ data: [], error: null });
     });
     const { default: UsersPage } = await import('@/app/users/page');
-    const tree = await UsersPage();
-    const { container } = render(tree);
-    expect(container.textContent).toMatch(/Users/);
+    render(<UsersPage />);
+    expect(await screen.findByText(/Users/)).toBeTruthy();
   });
 });
 
@@ -221,14 +240,14 @@ describe('app/users/[id]/page.tsx', () => {
       if (table === 'users') return chain({ data: user, error: null });
       return chain({ data: jobs, error: null });
     });
+    currentParams = { id: user.id };
+    currentSearchParams = {};
     const { default: UserDetail } = await import('@/app/users/[id]/page');
-    const tree = await UserDetail({
-      params: Promise.resolve({ id: user.id }),
-      searchParams: Promise.resolve({}),
-    });
-    const { container } = render(tree);
-    expect(container.textContent).toContain('carol@x.com');
-    expect(container.textContent).toMatch(/Total Jobs/);
+    render(<UserDetail />);
+    // email may appear in both header and jobs table rows
+    const emailEls = await screen.findAllByText('carol@x.com');
+    expect(emailEls.length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText(/Total Jobs/)).toBeTruthy();
   });
 
   it('renders empty job history', async () => {
@@ -237,24 +256,20 @@ describe('app/users/[id]/page.tsx', () => {
       if (table === 'users') return chain({ data: user, error: null });
       return chain({ data: [], error: null });
     });
+    currentParams = { id: user.id };
+    currentSearchParams = {};
     const { default: UserDetail } = await import('@/app/users/[id]/page');
-    const tree = await UserDetail({
-      params: Promise.resolve({ id: user.id }),
-      searchParams: Promise.resolve({}),
-    });
-    const { container } = render(tree);
-    expect(container.textContent).toMatch(/No jobs for this user/);
+    render(<UserDetail />);
+    expect(await screen.findByText(/No jobs for this user/)).toBeTruthy();
   });
 
   it('renders "User not found" when the user does not exist', async () => {
     mockedFrom.mockImplementation(() => chain({ data: null, error: null }));
+    currentParams = { id: 'missing' };
+    currentSearchParams = {};
     const { default: UserDetail } = await import('@/app/users/[id]/page');
-    const tree = await UserDetail({
-      params: Promise.resolve({ id: 'missing' }),
-      searchParams: Promise.resolve({}),
-    });
-    const { container } = render(tree);
-    expect(container.textContent).toMatch(/User not found/);
+    render(<UserDetail />);
+    expect(await screen.findByText(/User not found/)).toBeTruthy();
   });
 });
 
