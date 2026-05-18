@@ -147,13 +147,13 @@ describe('app/queue/page.tsx', () => {
 // --- Jobs index page ----------------------------------------------------
 
 describe('app/jobs/page.tsx', () => {
-  it('renders All Jobs header and jobs table on success', async () => {
-    mockedFrom.mockReturnValue(chain({ data: [makeJob({ state: 'SUCCESS' })], error: null }));
+  it('redirects to /queue (list view dropped — route consolidated)', async () => {
+    redirectMock.mockClear();
+    // JobsPage is now a server-component redirect; calling it triggers redirectMock
     const { default: JobsPage } = await import('@/app/jobs/page');
-    const { container } = render(<JobsPage />);
-    expect(container.textContent).toMatch(/All Jobs/);
-    // wait a tick for state update to settle
-    await screen.findByText(/All Jobs/);
+    // Call as a function (server component pattern) since it returns never
+    try { (JobsPage as () => never)(); } catch { /* redirect throws in real Next.js */ }
+    expect(redirectMock).toHaveBeenCalledWith('/queue');
   });
 });
 
