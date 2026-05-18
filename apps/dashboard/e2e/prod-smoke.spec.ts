@@ -21,16 +21,22 @@ test.describe('prod-smoke', () => {
     await expect(chip).toBeVisible();
   });
 
-  test('Nav link to /jobs exists', async ({ page }) => {
-    await page.goto('/queue');
-    const jobsLink = page.locator('a[href*="/jobs"]').first();
-    await expect(jobsLink).toBeVisible();
-  });
-
   test('Nav link to /users exists', async ({ page }) => {
     await page.goto('/queue');
     const usersLink = page.locator('a[href*="/users"]').first();
     await expect(usersLink).toBeVisible();
+  });
+
+  test('nav has exactly 2 items (Queue and Users only, no Jobs)', async ({ page }) => {
+    await page.goto('/queue');
+    const navLinks = page.locator('nav[aria-label="primary navigation"] a');
+    await expect(navLinks).toHaveCount(2);
+    const hrefs = await navLinks.evaluateAll((els: Element[]) =>
+      (els as HTMLAnchorElement[]).map(e => e.getAttribute('href'))
+    );
+    expect(hrefs).toContain('/queue');
+    expect(hrefs).toContain('/users');
+    expect(hrefs).not.toContain('/jobs');
   });
 });
 
@@ -300,26 +306,26 @@ test.describe("user-detail-consistency: list count matches detail count", () => 
   });
 });
 
-test.describe("/jobs vs /queue distinctness", () => {
-  test("/jobs and /queue show different h1 headings", async ({
-    page,
-  }) => {
-    const PROD_URL =
-      process.env.PROD_URL ?? "https://main.d2y6yvvlxvd81b.amplifyapp.com";
-
-    await page.goto(PROD_URL + "/queue", { waitUntil: "networkidle" });
+test.describe('user-detail-consistency', () => {
+  test('each /users row navigates to a non-404 detail page', async ({ page }) => {
+    await page.goto(PROD_URL + '/users', { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
-    const queueH1 = (await page.locator("h1").first().textContent()) ?? "";
-
-    await page.goto(PROD_URL + "/jobs", { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000);
-    const jobsH1 = (await page.locator("h1").first().textContent()) ?? "";
-
-    expect(
-      queueH1.trim(),
-      "/queue and /jobs must have distinct h1 headings — if identical, product differentiation has not landed",
-    ).not.toBe(jobsH1.trim());
-
-    console.log("/queue h1=" + queueH1.trim() + " /jobs h1=" + jobsH1.trim());
+    const rows = page.locator('tbody tr');
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, 'No user rows in prod — skip until data is seeded');
+    expect(rowCount, 'users list must have at least 1 row').toBeGreaterThanOrEqual(1);
+    // Check first 3 rows only (avoids test timeout on large user sets)
+    const limit = Math.min(rowCount, 3);
+    for (let i = 0; i < limit; i++) {
+      await page.goto(PROD_URL + '/users', { waitUntil: 'networkidle' });
+      await page.waitForTimeout(1500);
+      const row = page.locator('tbody tr').nth(i);
+      await row.click();
+      await page.waitForTimeout(1500);
+      const status = page.locator('[data-testid="error-404"], h1:has-text("404"), h1:has-text("Not Found")');
+      const is404 = (await status.count()) > 0;
+      expect(is404, `User row ${i} navigated to a 404 page: ${page.url()}`).toBe(false);
+    }
   });
 });
+
