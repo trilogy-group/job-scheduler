@@ -41,9 +41,9 @@ describe('QueueTable', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders empty state when no jobs', () => {
+  it('renders empty state when no jobs (default QUEUED+PROGRESS filter → "No active jobs.")', () => {
     render(<QueueTable jobs={[]} />);
-    expect(screen.getByText('No jobs found.')).toBeInTheDocument();
+    expect(screen.getByTestId('empty-state')).toHaveTextContent('No active jobs.');
   });
 
   it('renders a search input with the expected aria-label', () => {

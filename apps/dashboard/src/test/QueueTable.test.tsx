@@ -21,9 +21,9 @@ afterEach(() => {
 });
 
 describe('QueueTable', () => {
-  it('renders empty-state message when no jobs', () => {
+  it('renders empty-state message when no jobs (default QUEUED+PROGRESS filter shows "No active jobs.")', () => {
     render(<QueueTable jobs={[]} />);
-    expect(screen.getByText(/No jobs found/i)).toBeTruthy();
+    expect(screen.getByTestId('empty-state').textContent).toMatch(/No active jobs/i);
   });
 
   it('shows position "1" for the first QUEUED job', () => {
@@ -147,6 +147,7 @@ describe('QueueTable', () => {
       render(<QueueTable jobs={[job]} />);
       expect(screen.getByText('check-progress-default-visible')).toBeTruthy();
       expect(screen.queryByText('No jobs found')).toBeNull();
+      expect(screen.queryByText('No active jobs.')).toBeNull();
     });
   });
 });

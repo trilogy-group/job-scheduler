@@ -8,15 +8,15 @@ import { JobModal } from './JobModal';
 import { humanizeAge } from '@/lib/time';
 
 const ALL_STATES = ['QUEUED', 'PROGRESS', 'SUCCESS', 'FAIL', 'CANCELLED'] as const;
+const DEFAULT_ACTIVE_STATES: readonly string[] = ['QUEUED', 'PROGRESS'];
 
 function parseStateParam(param: string | null | undefined): Set<string> {
-  if (!param) return new Set(ALL_STATES);
+  if (param === null || param === undefined) return new Set(DEFAULT_ACTIVE_STATES);
   const known = new Set<string>(ALL_STATES);
   const parts = param
     .split(',')
     .map((s) => s.trim())
     .filter((s) => known.has(s));
-  if (parts.length === 0) return new Set(ALL_STATES);
   return new Set(parts);
 }
 
@@ -114,7 +114,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
       <div className="flex flex-wrap gap-2 mb-3 items-center">
         <input
           type="search"
-          placeholder="Search jobs…"
+          placeholder="Search jobs or users…"
           aria-label="search jobs"
           name="search"
           value={query}
@@ -141,8 +141,14 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
         </span>
       </div>
       {filtered.length === 0 ? (
-        <div className="text-center text-[var(--fg-subtle)] py-12">
-          No jobs found.
+        <div
+          data-testid="empty-state"
+          className="text-center text-[var(--fg-subtle)] py-12"
+        >
+          {activeStates.size > 0 &&
+          Array.from(activeStates).every((s) => s === 'QUEUED' || s === 'PROGRESS')
+            ? 'No active jobs.'
+            : 'No jobs found.'}
         </div>
       ) : (
         <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
