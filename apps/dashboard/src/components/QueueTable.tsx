@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { JobEnriched } from '@/lib/types';
 import { StateBadge } from './StateBadge';
+import { JobModal } from './JobModal';
 import { humanizeAge } from '@/lib/time';
 
 const ALL_STATES = ['QUEUED', 'PROGRESS', 'SUCCESS', 'FAIL', 'CANCELLED'] as const;
@@ -30,6 +31,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
   const [activeStates, setActiveStates] = useState<Set<string>>(
     new Set(ALL_STATES),
   );
+  const [selectedJob, setSelectedJob] = useState<JobEnriched | null>(null);
 
   function toggleState(s: string) {
     setActiveStates((prev) => {
@@ -131,7 +133,8 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                     data-state={job.state}
                     data-testid={job.is_orphan ? 'orphan-row' : undefined}
                     title={job.is_orphan ? 'Started outside the queue' : undefined}
-                    className={`${zebra} hover:bg-[var(--bg-hover)] transition-colors ${orphanEdge}`}
+                    onClick={() => setSelectedJob(job)}
+                    className={`${zebra} hover:bg-[var(--bg-hover)] transition-colors cursor-pointer ${orphanEdge}`}
                   >
                     <td className="px-3 py-2 text-[var(--fg-muted)]">
                       {job.is_orphan ? (
@@ -168,6 +171,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
           </table>
         </div>
       )}
+      <JobModal job={selectedJob} onClose={() => setSelectedJob(null)} />
     </div>
   );
 }

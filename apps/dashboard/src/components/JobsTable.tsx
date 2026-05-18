@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { JobEnriched } from '@/lib/types';
 import { StateBadge } from './StateBadge';
+import { JobModal } from './JobModal';
 
 const PAGE_SIZE = 50;
 const ALL_STATES = ['QUEUED', 'PROGRESS', 'SUCCESS', 'FAIL', 'CANCELLED'] as const;
@@ -23,6 +24,7 @@ export function JobsTable({ jobs }: { jobs: JobEnriched[] }) {
   const [query, setQuery] = useState('');
   const [activeStates, setActiveStates] = useState<Set<string>>(new Set(ALL_STATES));
   const [page, setPage] = useState(0);
+  const [selectedJob, setSelectedJob] = useState<JobEnriched | null>(null);
 
   const filtered = jobs
     .filter((j) => activeStates.has(j.state))
@@ -119,8 +121,10 @@ export function JobsTable({ jobs }: { jobs: JobEnriched[] }) {
                   return (
                     <tr
                       key={job.id}
+                      data-testid={`job-row-${job.id}`}
+                      onClick={() => setSelectedJob(job)}
                       style={{ backgroundColor: rowBg, borderBottom: '1px solid var(--border)' }}
-                      className="hover:bg-[--bg-hover] transition-colors"
+                      className="hover:bg-[--bg-hover] transition-colors cursor-pointer"
                     >
                       <td className="px-3 py-2 font-medium max-w-xs truncate" title={name} style={{ color: 'var(--fg)' }}>
                         {name}
@@ -173,6 +177,7 @@ export function JobsTable({ jobs }: { jobs: JobEnriched[] }) {
           )}
         </>
       )}
+      <JobModal job={selectedJob} onClose={() => setSelectedJob(null)} />
     </div>
   );
 }
