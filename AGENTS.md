@@ -96,3 +96,14 @@ Any ticket whose deliverable is a **deployed UI surface** MUST NOT be marked clo
 If verification is skipped or fails, the ticket MUST remain `in_progress` and the failure reason MUST be surfaced to the meta-controller.
 
 ---
+
+## /users + /jobs data-consistency closure gate (added 2026-05-18)
+
+Any ticket touching `/users`, `/users/[id]`, or `/jobs` pages MUST NOT be closed until BOTH pass against the live prod URL (`https://main.d2y6yvvlxvd81b.amplifyapp.com`):
+
+1. **User-detail consistency** — `/users` first user with job_count>0 → click → `/users/[id]` shows ≥1 job row.
+2. **Jobs/queue distinctness** — `/jobs` and `/queue` have different row counts or different job names; both have ≥1 row.
+
+These are codified in `e2e/prod-smoke.spec.ts`. Run via `testing` sub-agent against prod, never localhost.
+
+Rationale: "list/detail count drift" (T2 regression — `is_orphan` filter zeroed detail while list showed non-zero counts) is invisible to general smoke tests.
