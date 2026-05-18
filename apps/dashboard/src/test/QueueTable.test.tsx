@@ -1,5 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => '/queue',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { QueueTable } from '@/components/QueueTable';
 import { makeJob } from './fixtures';
 import type { JobEnriched } from '@/lib/types';

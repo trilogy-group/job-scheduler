@@ -14,6 +14,8 @@ vi.mock('next/navigation', () => ({
   redirect: (...args: unknown[]) => redirectMock(...args),
   notFound: (...args: unknown[]) => notFoundMock(...args),
   usePathname: () => '/queue',
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('next/link', () => ({
