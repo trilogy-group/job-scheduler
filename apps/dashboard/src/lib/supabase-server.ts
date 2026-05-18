@@ -1,3 +1,5 @@
+// NOTE: this module is retained for scheduler scripts and Edge Functions.
+// Dashboard pages use supabase-browser.ts for client-side data fetching.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const SERVER_URL =

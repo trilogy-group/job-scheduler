@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { JobEnriched, JobKind } from '@/lib/types';
 import { StateBadge } from './StateBadge';
@@ -59,6 +59,13 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
   );
   const [selectedJob, setSelectedJob] = useState<JobEnriched | null>(null);
   const [orphanRows, setOrphanRows] = useState<JobEnriched[]>([]);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (tableRef.current) {
+      tableRef.current.setAttribute("data-clickable", "true");
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,7 +178,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
   }
 
   return (
-    <div>
+    <div ref={tableRef}>
       <div className="flex flex-wrap gap-2 mb-3 items-center">
         <input
           type="search"
@@ -239,7 +246,15 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                     data-state={job.state}
                     data-testid={job.is_orphan ? 'orphan-row' : `job-row-${job.id}`}
                     title={job.is_orphan ? 'Started outside the queue' : undefined}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedJob(job)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedJob(job);
+                      }
+                    }}
                     className={`${zebra} hover:bg-[var(--bg-hover)] transition-colors cursor-pointer ${orphanEdge}`}
                   >
                     <td className="px-3 py-2 text-[var(--fg-muted)]">
@@ -269,7 +284,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                     <td className="px-3 py-2">
                       <StateBadge state={job.state} />
                     </td>
-                    <td className="px-3 py-2 text-[var(--fg-muted)]">{humanizeAge(job.created_at)}</td>
+                    <td suppressHydrationWarning className="px-3 py-2 text-[var(--fg-muted)]">{humanizeAge(job.created_at)}</td>
                   </tr>
                 );
               })}
