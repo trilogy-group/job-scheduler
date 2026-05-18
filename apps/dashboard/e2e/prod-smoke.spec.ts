@@ -323,3 +323,49 @@ test.describe("/jobs vs /queue distinctness", () => {
     console.log("/queue h1=" + queueH1.trim() + " /jobs h1=" + jobsH1.trim());
   });
 });
+
+test.describe('user-detail-consistency', () => {
+  test('each /users row navigates to a non-404 detail page', async ({ page }) => {
+    await page.goto(PROD_URL + '/users', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+    const rows = page.locator('tbody tr');
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, 'No user rows in prod — skip until data is seeded');
+    expect(rowCount, 'users list must have at least 1 row').toBeGreaterThanOrEqual(1);
+    // Check first 3 rows only (avoids test timeout on large user sets)
+    const limit = Math.min(rowCount, 3);
+    for (let i = 0; i < limit; i++) {
+      await page.goto(PROD_URL + '/users', { waitUntil: 'networkidle' });
+      await page.waitForTimeout(1500);
+      const row = page.locator('tbody tr').nth(i);
+      await row.click();
+      await page.waitForTimeout(1500);
+      const status = page.locator('[data-testid="error-404"], h1:has-text("404"), h1:has-text("Not Found")');
+      const is404 = (await status.count()) > 0;
+      expect(is404, `User row ${i} navigated to a 404 page: ${page.url()}`).toBe(false);
+    }
+  });
+});
+
+test.describe('jobs-queue-distinctness', () => {
+  test('/jobs row count >= /queue row count (queue is a subset by state filter)', async ({ page }) => {
+    await page.goto(PROD_URL + '/jobs', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+    const jobsRows = page.locator('tbody tr');
+    const jobsCount = await jobsRows.count();
+
+    await page.goto(PROD_URL + '/queue', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+    const queueRows = page.locator('tbody tr');
+    const queueCount = await queueRows.count();
+
+    test.skip(
+      jobsCount === 0 && queueCount === 0,
+      'No data in prod — skip until jobs are present',
+    );
+    expect(
+      jobsCount,
+      `/jobs (${jobsCount}) should have >= /queue (${queueCount}) rows since queue is a filtered subset`,
+    ).toBeGreaterThanOrEqual(queueCount);
+  });
+});
