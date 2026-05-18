@@ -90,7 +90,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
     syncUrl(query, next);
   }
 
-  const filtered = jobs
+  const filteredRaw = jobs
     .filter((j) => activeStates.has(j.state))
     .filter((j) => {
       if (!query.trim()) return true;
@@ -100,9 +100,15 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
       return name.includes(q) || user.includes(q);
     });
 
+  // Split into non-orphan and orphan groups, preserving relative order in each.
+  const nonOrphans = filteredRaw.filter((j) => !j.is_orphan);
+  const orphans = filteredRaw.filter((j) => j.is_orphan);
+  const filtered = [...nonOrphans, ...orphans];
+
+  // Compute 1-based positions among non-orphan QUEUED jobs only.
   const queuedOrder = new Map<string, number>();
   let pos = 0;
-  for (const j of filtered) {
+  for (const j of nonOrphans) {
     if (j.state === 'QUEUED') {
       pos += 1;
       queuedOrder.set(j.id, pos);
@@ -171,16 +177,20 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                 const name = job.display_name ?? job.fireworks_job_name ?? job.id.slice(0, 8);
                 const user = job.user_email ?? job.user_id.slice(0, 8);
                 const zebra = idx % 2 === 1 ? 'bg-[var(--bg-elev)]' : 'bg-[var(--bg)]';
+                const orphanEdge = job.is_orphan ? 'border-l-2 border-amber-400' : '';
                 return (
                   <tr
                     key={job.id}
                     data-state={job.state}
-                    data-testid={`job-row-${job.id}`}
+                    data-testid={job.is_orphan ? 'orphan-row' : `job-row-${job.id}`}
+                    title={job.is_orphan ? 'Started outside the queue' : undefined}
                     onClick={() => setSelectedJob(job)}
-                    className={`${zebra} hover:bg-[var(--bg-hover)] transition-colors cursor-pointer`}
+                    className={`${zebra} hover:bg-[var(--bg-hover)] transition-colors cursor-pointer ${orphanEdge}`}
                   >
                     <td className="px-3 py-2 text-[var(--fg-muted)]">
-                      {job.state === 'PROGRESS' ? (
+                      {job.is_orphan ? (
+                        ''
+                      ) : job.state === 'PROGRESS' ? (
                         <span className="text-[var(--color-warn)]">▶</span>
                       ) : isQueued && queuedPos !== undefined ? (
                         <span className="inline-flex items-center justify-center size-5 rounded-full bg-[var(--color-accent-500)]/10 text-[var(--color-accent-500)] text-xs font-semibold tabular-nums">
@@ -190,7 +200,14 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                         ''
                       )}
                     </td>
-                    <td className="px-3 py-2 text-[var(--fg)] font-medium">{name}</td>
+                    <td className="px-3 py-2 text-[var(--fg)] font-medium">
+                      {name}
+                      {job.is_orphan && (
+                        <span className="ml-2 text-xs font-medium px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-400/40">
+                          External
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-[var(--fg-muted)]">{user}</td>
                     <td className="px-3 py-2 text-[var(--fg-muted)]">{job.kind}</td>
                     <td className="hidden sm:table-cell px-3 py-2 text-[var(--fg-muted)]">{job.gpu_count}</td>

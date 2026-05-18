@@ -87,8 +87,10 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
                 return (
                   <tr
                     key={u.id}
+                    data-testid={`user-row-${u.id}`}
+                    onClick={() => router.push(`/users/${u.id}`)}
                     style={{ backgroundColor: rowBg, borderBottom: '1px solid var(--border)' }}
-                    className="hover:bg-[--bg-hover] transition-colors"
+                    className="hover:bg-[--bg-hover] transition-colors cursor-pointer"
                   >
                     <td className="px-3 py-2 font-medium" style={{ color: 'var(--fg)' }}>{u.email}</td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: 'var(--fg-muted)' }}>{u.job_count}</td>

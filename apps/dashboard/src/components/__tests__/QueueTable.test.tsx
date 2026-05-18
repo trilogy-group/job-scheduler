@@ -30,6 +30,7 @@ const makeJob = (overrides: Partial<JobEnriched> = {}): JobEnriched => ({
   output_model: null,
   dataset: null,
   failure_class: null,
+  is_orphan: false,
   ...overrides,
 });
 
@@ -108,5 +109,40 @@ describe('QueueTable', () => {
     );
     expect(screen.getByText('12345678')).toBeInTheDocument();
     expect(screen.getByText('87654321')).toBeInTheDocument();
+  });
+
+  it('highlights orphan jobs with amber left-border, External badge, tooltip, data-testid', () => {
+    render(
+      <QueueTable
+        jobs={[
+          makeJob({ id: 'orphan-01', display_name: 'ext-job', state: 'QUEUED', is_orphan: true }),
+          makeJob({ id: 'normal-01', display_name: 'normal-job', state: 'QUEUED', is_orphan: false }),
+        ]}
+      />,
+    );
+    const orphanRow = screen.getByTestId('orphan-row');
+    expect(orphanRow).toBeInTheDocument();
+    expect(orphanRow).toHaveAttribute('title', 'Started outside the queue');
+    expect(within(orphanRow).getByText('External')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('orphan-row')).toHaveLength(1);
+  });
+
+  it('orphan jobs appear after QUEUED+PROGRESS rows', () => {
+    render(
+      <QueueTable
+        jobs={[
+          makeJob({ id: 'orphan-1', display_name: 'orphan-first', state: 'QUEUED', is_orphan: true }),
+          makeJob({ id: 'queued-1', display_name: 'queued-normal', state: 'QUEUED', is_orphan: false }),
+          makeJob({ id: 'prog-1', display_name: 'prog-job', state: 'PROGRESS', is_orphan: false }),
+        ]}
+      />,
+    );
+    const rows = screen.getAllByRole('row').slice(1);
+    const names = rows.map(r => r.textContent ?? '');
+    const orphanIdx = names.findIndex(t => t.includes('orphan-first'));
+    const queuedIdx = names.findIndex(t => t.includes('queued-normal'));
+    const progIdx = names.findIndex(t => t.includes('prog-job'));
+    expect(orphanIdx).toBeGreaterThan(queuedIdx);
+    expect(orphanIdx).toBeGreaterThan(progIdx);
   });
 });

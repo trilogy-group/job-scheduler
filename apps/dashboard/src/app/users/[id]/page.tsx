@@ -6,6 +6,12 @@ import JobsOverTimeChart, {
 } from '@/components/charts/JobsOverTimeChart';
 import { createServerClient } from '@/lib/supabase-server';
 
+export async function generateStaticParams() {
+  const supabase = createServerClient();
+  const { data } = await supabase.from('users').select('id');
+  return (data ?? []).map((u: { id: string }) => ({ id: u.id }));
+}
+
 type Params = { id: string };
 type SearchParams = { sort?: string };
 
@@ -21,6 +27,7 @@ type JobRow = {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  is_orphan?: boolean;
 };
 
 type UserRow = {
@@ -157,7 +164,7 @@ export default async function UserDetailPage({
   const { data: jobsRaw } = await supabase
     .from('jobs')
     .select(
-      'id, kind, state, display_name, gpu_count, created_at, started_at, completed_at',
+      'id, kind, state, display_name, gpu_count, created_at, started_at, completed_at, is_orphan',
     )
     .eq('user_id', id);
 
@@ -234,7 +241,12 @@ export default async function UserDetailPage({
                 </tr>
               ) : (
                 sortedJobs.map((j) => (
-                  <tr key={j.id} className="border-t border-gray-100">
+                  <tr
+                    key={j.id}
+                    data-testid={j.is_orphan ? 'orphan-row' : undefined}
+                    title={j.is_orphan ? 'Started outside the queue' : undefined}
+                    className={`border-t border-gray-100${j.is_orphan ? ' border-l-2 border-amber-400' : ''}`}
+                  >
                     <td className="px-3 py-2">
                       <Link
                         href={`/jobs/${j.id}`}
@@ -242,6 +254,7 @@ export default async function UserDetailPage({
                       >
                         {j.display_name ?? j.id.slice(0, 8)}
                       </Link>
+                      {j.is_orphan && <span className="ml-2 text-xs font-medium px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-400/40">External</span>}
                     </td>
                     <td className="px-3 py-2">{j.kind}</td>
                     <td className="px-3 py-2"><StateBadge state={j.state} /></td>
