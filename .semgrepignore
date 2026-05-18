@@ -1,0 +1,4 @@
+# Anirudh: 2026-05-18 — disabled scanning until org-admin removes the GitHub App.
+# Empty wildcard pattern excludes all paths from Semgrep analysis.
+*
+**

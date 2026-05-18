@@ -21,16 +21,22 @@ test.describe('prod-smoke', () => {
     await expect(chip).toBeVisible();
   });
 
-  test('Nav link to /jobs exists', async ({ page }) => {
-    await page.goto('/queue');
-    const jobsLink = page.locator('a[href*="/jobs"]').first();
-    await expect(jobsLink).toBeVisible();
-  });
-
   test('Nav link to /users exists', async ({ page }) => {
     await page.goto('/queue');
     const usersLink = page.locator('a[href*="/users"]').first();
     await expect(usersLink).toBeVisible();
+  });
+
+  test('nav has exactly 2 items (Queue and Users only, no Jobs)', async ({ page }) => {
+    await page.goto('/queue');
+    const navLinks = page.locator('nav[aria-label="primary navigation"] a');
+    await expect(navLinks).toHaveCount(2);
+    const hrefs = await navLinks.evaluateAll((els: Element[]) =>
+      (els as HTMLAnchorElement[]).map(e => e.getAttribute('href'))
+    );
+    expect(hrefs).toContain('/queue');
+    expect(hrefs).toContain('/users');
+    expect(hrefs).not.toContain('/jobs');
   });
 });
 
@@ -300,30 +306,6 @@ test.describe("user-detail-consistency: list count matches detail count", () => 
   });
 });
 
-test.describe("/jobs vs /queue distinctness", () => {
-  test("/jobs and /queue show different h1 headings", async ({
-    page,
-  }) => {
-    const PROD_URL =
-      process.env.PROD_URL ?? "https://main.d2y6yvvlxvd81b.amplifyapp.com";
-
-    await page.goto(PROD_URL + "/queue", { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000);
-    const queueH1 = (await page.locator("h1").first().textContent()) ?? "";
-
-    await page.goto(PROD_URL + "/jobs", { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000);
-    const jobsH1 = (await page.locator("h1").first().textContent()) ?? "";
-
-    expect(
-      queueH1.trim(),
-      "/queue and /jobs must have distinct h1 headings — if identical, product differentiation has not landed",
-    ).not.toBe(jobsH1.trim());
-
-    console.log("/queue h1=" + queueH1.trim() + " /jobs h1=" + jobsH1.trim());
-  });
-});
-
 test.describe('user-detail-consistency', () => {
   test('each /users row navigates to a non-404 detail page', async ({ page }) => {
     await page.goto(PROD_URL + '/users', { waitUntil: 'networkidle' });
@@ -347,25 +329,3 @@ test.describe('user-detail-consistency', () => {
   });
 });
 
-test.describe('jobs-queue-distinctness', () => {
-  test('/jobs row count >= /queue row count (queue is a subset by state filter)', async ({ page }) => {
-    await page.goto(PROD_URL + '/jobs', { waitUntil: 'networkidle' });
-    await page.waitForTimeout(2000);
-    const jobsRows = page.locator('tbody tr');
-    const jobsCount = await jobsRows.count();
-
-    await page.goto(PROD_URL + '/queue', { waitUntil: 'networkidle' });
-    await page.waitForTimeout(2000);
-    const queueRows = page.locator('tbody tr');
-    const queueCount = await queueRows.count();
-
-    test.skip(
-      jobsCount === 0 && queueCount === 0,
-      'No data in prod — skip until jobs are present',
-    );
-    expect(
-      jobsCount,
-      `/jobs (${jobsCount}) should have >= /queue (${queueCount}) rows since queue is a filtered subset`,
-    ).toBeGreaterThanOrEqual(queueCount);
-  });
-});
