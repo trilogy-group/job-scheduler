@@ -95,4 +95,51 @@ describe('QueueTable', () => {
     // user_id is sliced to first 8 chars
     expect(screen.getByText('userxyzl')).toBeTruthy();
   });
+
+  describe('PROGRESS rendering regression (T-REGR-PROGRESS)', () => {
+    it('renders all 3 known PROGRESS job names that were missing from static build', () => {
+      const progressJobs: JobEnriched[] = [
+        makeJob({
+          id: 'fw-p1',
+          state: 'PROGRESS',
+          display_name: 'math-g6-iter4-qwen3thinking-foundation',
+          user_email: 'anirudh.shrikanth@trilogy.com',
+          gpu_count: 4,
+        }) as unknown as JobEnriched,
+        makeJob({
+          id: 'fw-p2',
+          state: 'PROGRESS',
+          display_name: 'math-g6-iter4-qwen25math-foundation',
+          user_email: 'anirudh.shrikanth@trilogy.com',
+          gpu_count: 4,
+        }) as unknown as JobEnriched,
+        makeJob({
+          id: 'fw-p3',
+          state: 'PROGRESS',
+          display_name: 'edullm-math-forge-g4-imgdense-cap25000-v2',
+          user_email: 'anirudh.shrikanth@trilogy.com',
+          gpu_count: 4,
+        }) as unknown as JobEnriched,
+      ];
+      render(<QueueTable jobs={progressJobs} />);
+      expect(screen.getByText('math-g6-iter4-qwen3thinking-foundation')).toBeTruthy();
+      expect(screen.getByText('math-g6-iter4-qwen25math-foundation')).toBeTruthy();
+      expect(screen.getByText('edullm-math-forge-g4-imgdense-cap25000-v2')).toBeTruthy();
+      const progressIndicators = screen.getAllByText('▶');
+      expect(progressIndicators.length).toBe(3);
+      const emailEls = screen.getAllByText('anirudh.shrikanth@trilogy.com');
+      expect(emailEls.length).toBe(3);
+    });
+
+    it('PROGRESS jobs are visible with default filter state (no user interaction required)', () => {
+      const job = makeJob({
+        id: 'fw-p4',
+        state: 'PROGRESS',
+        display_name: 'check-progress-default-visible',
+      }) as unknown as JobEnriched;
+      render(<QueueTable jobs={[job]} />);
+      expect(screen.getByText('check-progress-default-visible')).toBeTruthy();
+      expect(screen.queryByText('No jobs found')).toBeNull();
+    });
+  });
 });
