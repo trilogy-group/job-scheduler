@@ -33,6 +33,7 @@ export interface JobEnriched extends Job {
   output_model: string | null;
   dataset: string | null;
   failure_class: string | null;
+  is_orphan?: boolean;
 }
 
 export interface SchedulerTick {
