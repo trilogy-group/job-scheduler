@@ -6,6 +6,12 @@ import JobsOverTimeChart, {
 } from '@/components/charts/JobsOverTimeChart';
 import { createServerClient } from '@/lib/supabase-server';
 
+export async function generateStaticParams() {
+  const supabase = createServerClient();
+  const { data } = await supabase.from('users').select('id');
+  return (data ?? []).map((u: { id: string }) => ({ id: u.id }));
+}
+
 type Params = { id: string };
 type SearchParams = { sort?: string };
 
