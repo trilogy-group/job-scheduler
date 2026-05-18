@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
 vi.mock('next/navigation', () => ({
@@ -148,6 +148,89 @@ describe('QueueTable', () => {
       expect(screen.getByText('check-progress-default-visible')).toBeTruthy();
       expect(screen.queryByText('No jobs found')).toBeNull();
       expect(screen.queryByText('No active jobs.')).toBeNull();
+    });
+  });
+
+  describe('orphan merge from /api/fireworks-jobs (T-ORPHAN-POLLER)', () => {
+    beforeEach(() => {
+      // Use real timers so `waitFor` can poll the DOM.
+      vi.useRealTimers();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('renders orphan rows merged from /api/fireworks-jobs', async () => {
+      const fwName = 'accounts/trilogy/supervisedFineTuningJobs/orphan-xyz';
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          new Response(
+            JSON.stringify({
+              jobs: [
+                {
+                  name: fwName,
+                  kind: 'SFT',
+                  state: 'JOB_STATE_RUNNING',
+                  created_at: '2026-05-01T11:00:00Z',
+                  gpu_count: 4,
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        ),
+      );
+      const jobs: JobEnriched[] = [
+        makeJob({
+          id: 'tracked-1',
+          state: 'PROGRESS',
+          display_name: 'tracked-job',
+          fireworks_job_name: 'accounts/trilogy/supervisedFineTuningJobs/tracked-1',
+        }) as unknown as JobEnriched,
+      ];
+      render(<QueueTable jobs={jobs} />);
+      await waitFor(() => expect(screen.getByTestId('orphan-row')).toBeTruthy());
+      expect(screen.getByText('External')).toBeTruthy();
+      expect(screen.getByText('orphan-xyz')).toBeTruthy();
+    });
+
+    it('does not mark orphan for a Fireworks job already in jobs prop by fireworks_job_name', async () => {
+      const fwName = 'accounts/trilogy/supervisedFineTuningJobs/tracked-1';
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          new Response(
+            JSON.stringify({
+              jobs: [
+                {
+                  name: fwName,
+                  kind: 'SFT',
+                  state: 'JOB_STATE_RUNNING',
+                  created_at: '2026-05-01T11:00:00Z',
+                  gpu_count: 4,
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        ),
+      );
+      const jobs: JobEnriched[] = [
+        makeJob({
+          id: 'tracked-1',
+          state: 'PROGRESS',
+          display_name: 'tracked-job',
+          fireworks_job_name: fwName,
+        }) as unknown as JobEnriched,
+      ];
+      render(<QueueTable jobs={jobs} />);
+      // Wait a tick for the effect to resolve.
+      await waitFor(() => expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0));
+      // Give React a chance to flush state from the resolved promise.
+      await new Promise((r) => setTimeout(r, 0));
+      expect(screen.queryByTestId('orphan-row')).toBeNull();
     });
   });
 });
