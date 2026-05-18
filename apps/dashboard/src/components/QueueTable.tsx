@@ -192,6 +192,8 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                         ''
                       ) : job.state === 'PROGRESS' ? (
                         <span className="text-[var(--color-warn)]">▶</span>
+                      ) : job.is_orphan ? (
+                        ''
                       ) : isQueued && queuedPos !== undefined ? (
                         <span className="inline-flex items-center justify-center size-5 rounded-full bg-[var(--color-accent-500)]/10 text-[var(--color-accent-500)] text-xs font-semibold tabular-nums">
                           {queuedPos}
