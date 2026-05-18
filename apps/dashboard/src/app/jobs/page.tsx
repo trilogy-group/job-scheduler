@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { createBrowserClient } from "@/lib/supabase-browser";
 import { JobsTable } from "@/components/JobsTable";
 import type { JobEnriched } from "@/lib/types";
@@ -65,9 +65,11 @@ export default function JobsPage() {
         </p>
       )}
       {jobs === null ? (
-        <div className="text-sm" style={{ color: 'var(--fg)' }}>Loading…</div>
+        <div className="py-12 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>Loading jobs…</div>
       ) : (
-        <JobsTable jobs={jobs} />
+        <Suspense fallback={<div className="py-12 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>Loading jobs…</div>}>
+          <JobsTable jobs={jobs} />
+        </Suspense>
       )}
     </div>
   );

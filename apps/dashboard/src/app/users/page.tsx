@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { createBrowserClient } from "@/lib/supabase-browser";
 import { UsersTable } from "@/components/UsersTable";
 
@@ -90,9 +90,11 @@ export default function UsersPage() {
         </p>
       )}
       {usersWithStats === null ? (
-        <div className="text-sm" style={{ color: 'var(--fg)' }}>Loading…</div>
+        <div className="py-12 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>Loading users…</div>
       ) : (
-        <UsersTable users={usersWithStats} />
+        <Suspense fallback={<div className="py-12 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>Loading users…</div>}>
+          <UsersTable users={usersWithStats} />
+        </Suspense>
       )}
     </div>
   );

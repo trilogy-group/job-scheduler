@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 interface UserWithStats {
@@ -20,6 +20,13 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
   const [query, setQueryState] = useState<string>(
     () => searchParams?.get('q') ?? '',
   );
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (tableRef.current) {
+      tableRef.current.setAttribute("data-clickable", "true");
+    }
+  }, []);
 
   const syncUrl = useCallback(
     (nextQuery: string) => {
@@ -46,7 +53,7 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
   );
 
   return (
-    <div>
+    <div ref={tableRef}>
       <div className="flex gap-2 mb-4 items-center">
         <input
           type="search"
@@ -88,7 +95,15 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
                   <tr
                     key={u.id}
                     data-testid={`user-row-${u.id}`}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => router.push(`/users/${u.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/users/${u.id}`);
+                      }
+                    }}
                     style={{ backgroundColor: rowBg, borderBottom: '1px solid var(--border)' }}
                     className="hover:bg-[--bg-hover] transition-colors cursor-pointer"
                   >
