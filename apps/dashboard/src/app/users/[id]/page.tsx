@@ -151,12 +151,13 @@ export default function UserDetailPage() {
         return;
       }
 
-      const { data: jobsRaw } = await supabase
+      const { data: jobsRaw, error: jobsErr } = await supabase
         .from('jobs')
         .select(
-          'id, kind, state, display_name, gpu_count, created_at, started_at, completed_at, is_orphan',
+          'id, kind, state, display_name, gpu_count, created_at, started_at, completed_at',
         )
         .eq('user_id', id);
+      if (jobsErr) console.error('[users/[id]] jobs fetch error:', jobsErr.message);
 
       if (cancelled) return;
       setJobs((jobsRaw ?? []) as JobRow[]);
@@ -181,7 +182,7 @@ export default function UserDetailPage() {
       <main className="p-6">
         <Breadcrumb
           items={[
-            { href: '/', label: 'Users' },
+            { href: '/users', label: 'Users' },
             { label: id },
           ]}
         />
@@ -208,7 +209,7 @@ export default function UserDetailPage() {
     <main className="p-6 space-y-6">
       <Breadcrumb
         items={[
-          { href: '/', label: 'Users' },
+          { href: '/users', label: 'Users' },
           { label: userRow.email },
         ]}
       />
