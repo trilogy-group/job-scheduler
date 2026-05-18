@@ -36,7 +36,7 @@ const FILTER_ACTIVE_STYLES: Record<string, string> = {
 const FILTER_BASE =
   'px-2 py-1 rounded-md text-xs font-medium border transition-all';
 const FILTER_INACTIVE =
-  'border-[var(--border)] bg-[var(--bg-elev)] text-[var(--fg-muted)] opacity-50';
+  'border-[var(--border)] bg-[var(--bg-elev)] text-[var(--fg-muted)]';
 
 interface FireworksJobSummaryClient {
   name: string;
