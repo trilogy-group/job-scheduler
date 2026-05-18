@@ -1,10 +1,23 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { JobEnriched } from '@/lib/types';
 import { StateBadge } from './StateBadge';
+import { JobModal } from './JobModal';
 
 const PAGE_SIZE = 50;
 const ALL_STATES = ['QUEUED', 'PROGRESS', 'SUCCESS', 'FAIL', 'CANCELLED'] as const;
+
+function parseStateParam(param: string | null | undefined): Set<string> {
+  if (!param) return new Set(ALL_STATES);
+  const known = new Set<string>(ALL_STATES);
+  const parts = param
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => known.has(s));
+  if (parts.length === 0) return new Set(ALL_STATES);
+  return new Set(parts);
+}
 
 // Synapse semantic chip colors
 const CHIP_STYLES: Record<string, { activeBg: string; activeText: string; activeBorder: string }> = {
@@ -20,9 +33,46 @@ function fmtDate(iso: string) {
 }
 
 export function JobsTable({ jobs }: { jobs: JobEnriched[] }) {
-  const [query, setQuery] = useState('');
-  const [activeStates, setActiveStates] = useState<Set<string>>(new Set(ALL_STATES));
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [query, setQueryState] = useState<string>(
+    () => searchParams?.get('q') ?? '',
+  );
+  const [activeStates, setActiveStates] = useState<Set<string>>(() =>
+    parseStateParam(searchParams?.get('state')),
+  );
   const [page, setPage] = useState(0);
+  const [selectedJob, setSelectedJob] = useState<JobEnriched | null>(null);
+
+  const syncUrl = useCallback(
+    (nextQuery: string, nextStates: Set<string>) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      if (nextQuery.trim()) {
+        params.set('q', nextQuery);
+      } else {
+        params.delete('q');
+      }
+      if (nextStates.size === ALL_STATES.length) {
+        params.delete('state');
+      } else {
+        params.set(
+          'state',
+          ALL_STATES.filter((s) => nextStates.has(s)).join(','),
+        );
+      }
+      const qs = params.toString();
+      const target = qs ? `${pathname}?${qs}` : pathname;
+      router.replace(target);
+    },
+    [pathname, router, searchParams],
+  );
+
+  function setQuery(next: string) {
+    setQueryState(next);
+    syncUrl(next, activeStates);
+  }
 
   const filtered = jobs
     .filter((j) => activeStates.has(j.state))
@@ -39,16 +89,15 @@ export function JobsTable({ jobs }: { jobs: JobEnriched[] }) {
   const pageRows = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   function toggleState(s: string) {
-    setActiveStates((prev) => {
-      const next = new Set(prev);
-      if (next.has(s)) {
-        next.delete(s);
-      } else {
-        next.add(s);
-      }
-      return next;
-    });
+    const next = new Set(activeStates);
+    if (next.has(s)) {
+      next.delete(s);
+    } else {
+      next.add(s);
+    }
+    setActiveStates(next);
     setPage(0);
+    syncUrl(query, next);
   }
 
   return (
@@ -119,8 +168,10 @@ export function JobsTable({ jobs }: { jobs: JobEnriched[] }) {
                   return (
                     <tr
                       key={job.id}
+                      data-testid={`job-row-${job.id}`}
+                      onClick={() => setSelectedJob(job)}
                       style={{ backgroundColor: rowBg, borderBottom: '1px solid var(--border)' }}
-                      className="hover:bg-[--bg-hover] transition-colors"
+                      className="hover:bg-[--bg-hover] transition-colors cursor-pointer"
                     >
                       <td className="px-3 py-2 font-medium max-w-xs truncate" title={name} style={{ color: 'var(--fg)' }}>
                         {name}
@@ -173,6 +224,7 @@ export function JobsTable({ jobs }: { jobs: JobEnriched[] }) {
           )}
         </>
       )}
+      <JobModal job={selectedJob} onClose={() => setSelectedJob(null)} />
     </div>
   );
 }

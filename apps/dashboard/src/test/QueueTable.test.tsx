@@ -1,5 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => '/queue',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { QueueTable } from '@/components/QueueTable';
 import { makeJob } from './fixtures';
 import type { JobEnriched } from '@/lib/types';
@@ -14,9 +21,9 @@ afterEach(() => {
 });
 
 describe('QueueTable', () => {
-  it('renders empty-state message when no jobs', () => {
+  it('renders empty-state message when no jobs (default QUEUED+PROGRESS filter shows "No active jobs.")', () => {
     render(<QueueTable jobs={[]} />);
-    expect(screen.getByText(/No jobs found/i)).toBeTruthy();
+    expect(screen.getByTestId('empty-state').textContent).toMatch(/No active jobs/i);
   });
 
   it('shows position "1" for the first QUEUED job', () => {
@@ -140,6 +147,7 @@ describe('QueueTable', () => {
       render(<QueueTable jobs={[job]} />);
       expect(screen.getByText('check-progress-default-visible')).toBeTruthy();
       expect(screen.queryByText('No jobs found')).toBeNull();
+      expect(screen.queryByText('No active jobs.')).toBeNull();
     });
   });
 });

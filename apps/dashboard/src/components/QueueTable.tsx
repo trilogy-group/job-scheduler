@@ -1,11 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { JobEnriched } from '@/lib/types';
 import { StateBadge } from './StateBadge';
+import { JobModal } from './JobModal';
 import { humanizeAge } from '@/lib/time';
 
 const ALL_STATES = ['QUEUED', 'PROGRESS', 'SUCCESS', 'FAIL', 'CANCELLED'] as const;
+const DEFAULT_ACTIVE_STATES: readonly string[] = ['QUEUED', 'PROGRESS'];
+
+function parseStateParam(param: string | null | undefined): Set<string> {
+  if (param === null || param === undefined) return new Set(DEFAULT_ACTIVE_STATES);
+  const known = new Set<string>(ALL_STATES);
+  const parts = param
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => known.has(s));
+  return new Set(parts);
+}
 
 const FILTER_ACTIVE_STYLES: Record<string, string> = {
   QUEUED:
@@ -26,21 +39,55 @@ const FILTER_INACTIVE =
   'border-[var(--border)] bg-[var(--bg-elev)] text-[var(--fg-muted)] opacity-50';
 
 export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
-  const [query, setQuery] = useState('');
-  const [activeStates, setActiveStates] = useState<Set<string>>(
-    new Set(ALL_STATES),
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [query, setQueryState] = useState<string>(
+    () => searchParams?.get('q') ?? '',
+  );
+  const [activeStates, setActiveStates] = useState<Set<string>>(() =>
+    parseStateParam(searchParams?.get('state')),
+  );
+  const [selectedJob, setSelectedJob] = useState<JobEnriched | null>(null);
+
+  const syncUrl = useCallback(
+    (nextQuery: string, nextStates: Set<string>) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      if (nextQuery.trim()) {
+        params.set('q', nextQuery);
+      } else {
+        params.delete('q');
+      }
+      if (nextStates.size === ALL_STATES.length) {
+        params.delete('state');
+      } else {
+        params.set(
+          'state',
+          ALL_STATES.filter((s) => nextStates.has(s)).join(','),
+        );
+      }
+      const qs = params.toString();
+      const target = qs ? `${pathname}?${qs}` : pathname;
+      router.replace(target);
+    },
+    [pathname, router, searchParams],
   );
 
+  function setQuery(next: string) {
+    setQueryState(next);
+    syncUrl(next, activeStates);
+  }
+
   function toggleState(s: string) {
-    setActiveStates((prev) => {
-      const next = new Set(prev);
-      if (next.has(s)) {
-        next.delete(s);
-      } else {
-        next.add(s);
-      }
-      return next;
-    });
+    const next = new Set(activeStates);
+    if (next.has(s)) {
+      next.delete(s);
+    } else {
+      next.add(s);
+    }
+    setActiveStates(next);
+    syncUrl(query, next);
   }
 
   const filteredRaw = jobs
@@ -73,7 +120,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
       <div className="flex flex-wrap gap-2 mb-3 items-center">
         <input
           type="search"
-          placeholder="Search jobs…"
+          placeholder="Search jobs or users…"
           aria-label="search jobs"
           name="search"
           value={query}
@@ -100,8 +147,14 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
         </span>
       </div>
       {filtered.length === 0 ? (
-        <div className="text-center text-[var(--fg-subtle)] py-12">
-          No jobs found.
+        <div
+          data-testid="empty-state"
+          className="text-center text-[var(--fg-subtle)] py-12"
+        >
+          {activeStates.size > 0 &&
+          Array.from(activeStates).every((s) => s === 'QUEUED' || s === 'PROGRESS')
+            ? 'No active jobs.'
+            : 'No jobs found.'}
         </div>
       ) : (
         <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
@@ -129,9 +182,10 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
                   <tr
                     key={job.id}
                     data-state={job.state}
-                    data-testid={job.is_orphan ? 'orphan-row' : undefined}
+                    data-testid={job.is_orphan ? 'orphan-row' : `job-row-${job.id}`}
                     title={job.is_orphan ? 'Started outside the queue' : undefined}
-                    className={`${zebra} hover:bg-[var(--bg-hover)] transition-colors ${orphanEdge}`}
+                    onClick={() => setSelectedJob(job)}
+                    className={`${zebra} hover:bg-[var(--bg-hover)] transition-colors cursor-pointer ${orphanEdge}`}
                   >
                     <td className="px-3 py-2 text-[var(--fg-muted)]">
                       {job.is_orphan ? (
@@ -168,6 +222,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
           </table>
         </div>
       )}
+      <JobModal job={selectedJob} onClose={() => setSelectedJob(null)} />
     </div>
   );
 }

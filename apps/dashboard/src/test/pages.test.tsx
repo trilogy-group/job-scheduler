@@ -14,6 +14,8 @@ vi.mock('next/navigation', () => ({
   redirect: (...args: unknown[]) => redirectMock(...args),
   notFound: (...args: unknown[]) => notFoundMock(...args),
   usePathname: () => '/queue',
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('next/link', () => ({
@@ -118,7 +120,8 @@ describe('app/queue/page.tsx', () => {
     const tree = await QueuePage();
     const { container } = render(tree);
     expect(container.textContent).toMatch(/Active Queue/);
-    expect(container.textContent).toMatch(/No jobs found/);
+    // Queue page defaults to QUEUED+PROGRESS filter → contextual empty-state
+    expect(container.textContent).toMatch(/No active jobs/);
   });
 });
 

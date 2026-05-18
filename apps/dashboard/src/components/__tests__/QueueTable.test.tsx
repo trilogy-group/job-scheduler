@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => '/queue',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { QueueTable } from '@/components/QueueTable';
 import type { JobEnriched } from '@/lib/types';
 
@@ -35,9 +42,9 @@ describe('QueueTable', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders empty state when no jobs', () => {
+  it('renders empty state when no jobs (default QUEUED+PROGRESS filter → "No active jobs.")', () => {
     render(<QueueTable jobs={[]} />);
-    expect(screen.getByText('No jobs found.')).toBeInTheDocument();
+    expect(screen.getByTestId('empty-state')).toHaveTextContent('No active jobs.');
   });
 
   it('renders a search input with the expected aria-label', () => {

@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 interface UserWithStats {
   id: string;
@@ -14,7 +14,33 @@ interface UserWithStats {
 
 export function UsersTable({ users }: { users: UserWithStats[] }) {
   const router = useRouter();
-  const [query, setQuery] = useState('');
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [query, setQueryState] = useState<string>(
+    () => searchParams?.get('q') ?? '',
+  );
+
+  const syncUrl = useCallback(
+    (nextQuery: string) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      if (nextQuery.trim()) {
+        params.set('q', nextQuery);
+      } else {
+        params.delete('q');
+      }
+      const qs = params.toString();
+      const target = qs ? `${pathname}?${qs}` : pathname;
+      router.replace(target);
+    },
+    [pathname, router, searchParams],
+  );
+
+  function setQuery(next: string) {
+    setQueryState(next);
+    syncUrl(next);
+  }
+
   const filtered = users.filter(
     (u) => !query.trim() || u.email.toLowerCase().includes(query.toLowerCase()),
   );
