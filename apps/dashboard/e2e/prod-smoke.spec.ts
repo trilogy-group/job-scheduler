@@ -144,7 +144,8 @@ test.describe('MC-3: URL params survive page reload on /queue', () => {
 
 test.describe('MC-4: Click job row opens modal with GPU count and date', () => {
   test('clicking the first /queue row opens a modal with GPU + date info', async ({ page }) => {
-    await page.goto(PROD_URL + '/queue', { waitUntil: 'domcontentloaded' });
+    await page.goto(PROD_URL + '/queue', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
 
     const rows = page.locator('tbody tr');
     const rowCount = await rows.count();
@@ -153,18 +154,8 @@ test.describe('MC-4: Click job row opens modal with GPU count and date', () => {
     await rows.first().click();
     await page.waitForTimeout(2000);
 
-    const modal = page.locator('[data-testid="job-modal"]');
-    let modalVisible = false;
-    try {
-      await modal.waitFor({ state: 'visible', timeout: 5000 });
-      modalVisible = await modal.isVisible();
-    } catch {
-      modalVisible = false;
-    }
-    test.skip(
-      !modalVisible,
-      'job-modal not yet implemented — skip until job-scheduler-wiq lands',
-    );
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible({ timeout: 5000 });
 
     const modalText = (await modal.textContent()) ?? '';
     expect(modalText, 'modal should mention GPU count').toContain('GPU');
@@ -182,4 +173,65 @@ test.describe('MC-5: Orphan (Fireworks-only) rows highlighted on /queue', () => 
     );
     expect(count).toBeGreaterThanOrEqual(1);
   });
+});
+
+test.describe('T-CLICK: Interactive row behaviors', () => {
+
+  test('clicking a queue row opens job-detail modal', async ({ page }) => {
+    await page.goto(PROD_URL + '/queue', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
+    const rows = page.locator('tbody tr');
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, 'No queue rows');
+    const firstRowText = (await rows.first().textContent()) ?? '';
+    const container = page.locator('[data-clickable="true"]');
+    await expect(container).toBeAttached({ timeout: 5000 });
+    await rows.first().click();
+    await page.waitForTimeout(2000);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    const modalText = (await modal.textContent()) ?? '';
+    expect(modalText, 'modal must show GPU count label').toContain('GPU');
+    expect(modalText, 'modal must show a 4-digit year').toMatch(/\d{4}/);
+    console.log('T-CLICK queue row clicked:', firstRowText.substring(0, 80));
+    console.log('T-CLICK modal text:', modalText.substring(0, 200));
+  });
+
+  test('clicking a user row navigates to /users/[id]', async ({ page }) => {
+    await page.goto(PROD_URL + '/users', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
+    const rows = page.locator('tbody tr');
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, 'No user rows');
+    const firstEmail = (await rows.first().locator('td').first().textContent()) ?? '';
+    await rows.first().click();
+    await page.waitForTimeout(2000);
+    await expect(page).toHaveURL(/\/users\/[0-9a-f-]{36}/, { timeout: 5000 });
+    await expect(page.locator('h1')).toBeVisible();
+    console.log('T-CLICK user navigated to:', page.url(), 'email:', firstEmail);
+  });
+
+  test('modal closes on Escape', async ({ page }) => {
+    await page.goto(PROD_URL + '/queue', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
+    const rows = page.locator('tbody tr');
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, 'No queue rows');
+    await rows.first().click();
+    await page.waitForTimeout(1000);
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    await expect(modal).not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('data-clickable=true is set after hydration on /queue', async ({ page }) => {
+    await page.goto(PROD_URL + '/queue', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
+    const container = page.locator('[data-clickable="true"]');
+    await expect(container).toBeAttached({ timeout: 5000 });
+    expect(await container.count()).toBeGreaterThanOrEqual(1);
+  });
+
 });
