@@ -235,3 +235,91 @@ test.describe('T-CLICK: Interactive row behaviors', () => {
   });
 
 });
+
+test.describe("user-detail-consistency: list count matches detail count", () => {
+  test("first user with job_count > 0 on /users shows >= 1 job on /users/[id]", async ({
+    page,
+  }) => {
+    const PROD_URL =
+      process.env.PROD_URL ?? "https://main.d2y6yvvlxvd81b.amplifyapp.com";
+
+    await page.goto(PROD_URL + "/users", { waitUntil: "networkidle" });
+    await page.waitForTimeout(3000);
+
+    const rows = page.locator("tbody tr");
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, "No user rows on /users");
+
+    let targetRow = null;
+    let listJobCount = 0;
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const cells = row.locator("td");
+      const jobsCellText = (await cells.nth(1).textContent()) ?? "0";
+      const n = parseInt(jobsCellText.trim(), 10);
+      if (n > 0) {
+        targetRow = row;
+        listJobCount = n;
+        break;
+      }
+    }
+
+    test.skip(targetRow === null, "No user with job_count > 0 found on /users");
+    if (targetRow === null) return;
+
+    const listEmail =
+      (await targetRow.locator("td").first().textContent()) ?? "";
+    console.log(
+      "user-detail-consistency: clicking user " + listEmail + " with listJobCount=" + listJobCount,
+    );
+
+    await targetRow.click();
+    await page.waitForTimeout(3000);
+
+    await expect(page).toHaveURL(/\/users\/[0-9a-f-]{36}/, { timeout: 8000 });
+
+    const detailRows = page.locator("table tbody tr");
+    const detailRowCount = await detailRows.count();
+
+    const emptyState = page.locator("text=No jobs for this user.");
+    const emptyVisible = await emptyState.isVisible().catch(() => false);
+
+    expect(
+      emptyVisible,
+      "BUG: /users listed " + listEmail + " with " + listJobCount + " jobs but detail page shows 'No jobs for this user.'",
+    ).toBe(false);
+
+    expect(
+      detailRowCount,
+      "Expected >=1 job row on detail page, got " + detailRowCount,
+    ).toBeGreaterThanOrEqual(1);
+
+    console.log(
+      "user-detail-consistency PASS: detail shows " + detailRowCount + " rows for " + listEmail,
+    );
+  });
+});
+
+test.describe("/jobs vs /queue distinctness", () => {
+  test("/jobs and /queue show different h1 headings", async ({
+    page,
+  }) => {
+    const PROD_URL =
+      process.env.PROD_URL ?? "https://main.d2y6yvvlxvd81b.amplifyapp.com";
+
+    await page.goto(PROD_URL + "/queue", { waitUntil: "networkidle" });
+    await page.waitForTimeout(2000);
+    const queueH1 = (await page.locator("h1").first().textContent()) ?? "";
+
+    await page.goto(PROD_URL + "/jobs", { waitUntil: "networkidle" });
+    await page.waitForTimeout(2000);
+    const jobsH1 = (await page.locator("h1").first().textContent()) ?? "";
+
+    expect(
+      queueH1.trim(),
+      "/queue and /jobs must have distinct h1 headings — if identical, product differentiation has not landed",
+    ).not.toBe(jobsH1.trim());
+
+    console.log("/queue h1=" + queueH1.trim() + " /jobs h1=" + jobsH1.trim());
+  });
+});
