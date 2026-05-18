@@ -143,3 +143,51 @@ test.describe("Filter effect on /queue", () => {
     ).toBeLessThan(rowsBefore);
   });
 });
+
+// ---------------------------------------------------------------------------
+// D. PROGRESS rows visible when DB has them (regression for static-render bug)
+// ---------------------------------------------------------------------------
+test.describe("PROGRESS rows visible on /queue", () => {
+  test("at least one PROGRESS row renders when prod DB has PROGRESS jobs", async ({
+    page,
+  }) => {
+    await page.goto(PROD_URL + "/queue", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("tbody", { timeout: 10_000 }).catch(() => {});
+    const progressRows = page.locator('tr[data-state="PROGRESS"]');
+    const count = await progressRows.count();
+    // Prod has 3 confirmed PROGRESS jobs as of 2026-05-18 (per user screenshot).
+    // This test is the regression canary: FAILS on static-render builds because
+    // PROGRESS jobs started after the Amplify build are invisible.
+    // PASSES once T-FIX-DYNAMIC (dynamic rendering) lands.
+    expect(
+      count,
+      `Expected >=1 PROGRESS row on /queue but got ${count}. ` +
+        "Static-render regression: jobs started after Amplify build are invisible " +
+        "until T-FIX-DYNAMIC lands."
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  test("known PROGRESS job names appear in the /queue table", async ({
+    page,
+  }) => {
+    const knownProgressJobs = [
+      "math-g6-iter4-qwen3thinking-foundation",
+      "math-g6-iter4-qwen25math-foundation",
+      "edullm-math-forge-g4-imgdense-cap25000-v2",
+    ];
+    await page.goto(PROD_URL + "/queue", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("tbody", { timeout: 10_000 }).catch(() => {});
+    let foundAny = false;
+    for (const jobName of knownProgressJobs) {
+      const el = page.locator("td", { hasText: jobName });
+      if ((await el.count()) > 0) {
+        foundAny = true;
+        break;
+      }
+    }
+    expect(
+      foundAny,
+      `None of the known PROGRESS jobs appeared in /queue table. Static-render regression confirmed.`
+    ).toBe(true);
+  });
+});
