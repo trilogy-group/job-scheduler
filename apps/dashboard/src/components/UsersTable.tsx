@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface UserWithStats {
   id: string;
@@ -18,6 +19,7 @@ function successColor(rate: number): string {
 }
 
 export function UsersTable({ users }: { users: UserWithStats[] }) {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const filtered = users.filter(
     (u) => !query.trim() || u.email.toLowerCase().includes(query.toLowerCase()),
@@ -61,7 +63,9 @@ export function UsersTable({ users }: { users: UserWithStats[] }) {
               {filtered.map((u) => (
                 <tr
                   key={u.id}
-                  className="bg-[#0a0e11] hover:bg-[#1c2024] transition-colors"
+                  data-testid={`user-row-${u.id}`}
+                  onClick={() => router.push(`/users/${u.id}`)}
+                  className="bg-[#0a0e11] hover:bg-[#1c2024] transition-colors cursor-pointer"
                 >
                   <td className="px-3 py-2 text-[#f8f8f8]">{u.email}</td>
                   <td className="px-3 py-2 text-[#f8f8f8] font-medium">{u.job_count}</td>
