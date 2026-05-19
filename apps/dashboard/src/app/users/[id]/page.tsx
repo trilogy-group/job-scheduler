@@ -216,7 +216,7 @@ export default function UserDetailPage() {
 
       <header>
         <h1 className="text-2xl font-semibold">{userRow.email}</h1>
-        <p className="text-xs text-gray-500">User id: {userRow.id}</p>
+        <p className="text-xs text-gray-400">User id: {userRow.id}</p>
       </header>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -304,9 +304,9 @@ export default function UserDetailPage() {
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border border-gray-200 bg-white p-4">
-      <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
+    <div className="rounded border border-gray-700 bg-gray-800 p-4">
+      <div className="text-xs uppercase tracking-wide text-gray-300">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-white">{value}</div>
     </div>
   );
 }
