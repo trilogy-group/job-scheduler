@@ -2,7 +2,7 @@
 name: finetune-queue
 description: Submit, list, monitor, and cancel Fireworks fine-tuning jobs (SFT, DPO, RFT) for the Trilogy team via the fair-scheduler queue. ALWAYS use this instead of calling the Fireworks fine-tuning API directly or running `firectl supervised-fine-tuning-job ...`, `firectl dpoj ...`, or `firectl rft-job ...`.
 disable-model-invocation: false
-argument-hint: [enqueue|list|status|cancel] [--kind SFT|DPO|RFT] [--id <job-id>]
+argument-hint: [enqueue|list|status|cancel|queue-context|summary|job-analytics] [--kind SFT|DPO|RFT] [--id <job-id>]
 ---
 
 # Fireworks Fine-Tuning Scheduler
@@ -202,6 +202,90 @@ def enqueue(kind, fireworks_payload, *, display_name=None, gpu_count=4):
 def status(job_id):      return _req("GET",    f"/jobs/{job_id}")
 def list_jobs(**q):      return _req("GET",    "/jobs" + ("?" + "&".join(f"{k}={v}" for k,v in q.items()) if q else ""))
 def cancel(job_id):      return _req("DELETE", f"/jobs/{job_id}")
+
+def queue_context():         return _req("GET", "/jobs/analytics/queue")
+def summary():               return _req("GET", "/jobs/analytics/summary")
+def job_analytics(job_id):   return _req("GET", f"/jobs/{job_id}/analytics")
+```
+
+## Analytics
+
+Three read-only analytics endpoints sit alongside the core CRUD. They never mutate state and only ever surface jobs that belong to you (the API key identifies the caller).
+
+### Queue context — `GET /jobs/analytics/queue`
+
+```bash
+curl -sS -H "Authorization: Bearer $SFTQ_API_KEY" \
+  "$SUPABASE_URL/functions/v1/jobs-api/jobs/analytics/queue"
+```
+
+Returns:
+```json
+{
+  "your_progress_job": { "id": "...", "display_name": "...", "kind": "SFT", "gpu_count": 4, "started_at": "...", "fireworks_job_name": "..." } | null,
+  "your_queued_jobs": [
+    { "id": "...", "display_name": "...", "kind": "DPO", "gpu_count": 4, "created_at": "...", "queue_position": 2 }
+  ],
+  "global_queue_depth": 5,
+  "global_progress_count": 2,
+  "global_gpu_in_use": 8
+}
+```
+
+`queue_position` is the number of other users' QUEUED jobs ahead of yours by `created_at`.
+
+### Aggregate summary — `GET /jobs/analytics/summary`
+
+```bash
+curl -sS -H "Authorization: Bearer $SFTQ_API_KEY" \
+  "$SUPABASE_URL/functions/v1/jobs-api/jobs/analytics/summary"
+```
+
+Returns:
+```json
+{
+  "total": 47,
+  "by_state": { "QUEUED": 1, "PROGRESS": 0, "SUCCESS": 40, "FAIL": 4, "CANCELLED": 2 },
+  "by_kind":  { "SFT": 30, "DPO": 15, "RFT": 2 },
+  "success_rate": 0.909,
+  "avg_run_duration_seconds": 3720,
+  "total_gpu_hours": 413.5,
+  "recent_failures": [
+    { "id": "...", "display_name": "...", "kind": "SFT", "gpu_count": 4, "error": "...", "failed_at": "..." }
+  ]
+}
+```
+
+`success_rate` is `SUCCESS / (SUCCESS + FAIL + CANCELLED)`. Null if no terminal jobs yet.
+`recent_failures` lists up to 10 most recent FAIL jobs.
+
+### Per-job detail — `GET /jobs/:id/analytics`
+
+```bash
+curl -sS -H "Authorization: Bearer $SFTQ_API_KEY" \
+  "$SUPABASE_URL/functions/v1/jobs-api/jobs/<id>/analytics"
+```
+
+Returns `404` if the job id doesn't exist or isn't yours.
+
+```json
+{
+  "id": "...",
+  "display_name": "qwen3-14b baseline",
+  "kind": "SFT",
+  "state": "SUCCESS",
+  "gpu_count": 4,
+  "fireworks_job_name": "accounts/trilogy/supervisedFineTuningJobs/...",
+  "timeline": {
+    "queued_at": "2026-05-01T10:00:00Z",
+    "started_at": "2026-05-01T10:01:30Z",
+    "completed_at": "2026-05-01T11:04:15Z"
+  },
+  "queue_wait_seconds": 90,
+  "run_duration_seconds": 3765,
+  "gpu_hours": 4.183,
+  "error": null
+}
 ```
 
 ## Troubleshooting
@@ -273,3 +357,82 @@ This asymmetry is hidden from the API user — you always call `DELETE /jobs/:id
 - ❌ Using a teammate's API key (each key is per-user; the scheduler derives `user_id` from it).
 
 Every one of those violates the fairness guarantee. Always go through `jobs-api`.
+
+## Analytics
+
+Three new read-only commands for observability. No side effects.
+
+### Queue position — `analytics queue`
+
+```bash
+curl -sS -H "Authorization: Bearer $SFTQ_API_KEY" \
+  "$SUPABASE_URL/functions/v1/jobs-api/jobs/analytics/queue"
+```
+
+Returns your current queue context:
+```json
+{
+  "your_progress_job": { "id": "...", "kind": "SFT", "gpu_count": 4, "started_at": "...", "fireworks_job_name": "..." } | null,
+  "your_queued_jobs": [{ "id": "...", "kind": "SFT", "gpu_count": 4, "created_at": "...", "queue_position": 2 }],
+  "global_queue_depth": 3,
+  "global_progress_count": 2,
+  "global_gpu_in_use": 8
+}
+```
+
+- `your_progress_job` — your one running job (or null if idle).
+- `your_queued_jobs[].queue_position` — number of *other users'* QUEUED jobs ahead of yours (FIFO approximation).
+- `global_gpu_in_use` — sum of gpu_count across all PROGRESS jobs globally.
+
+### Aggregate metrics — `analytics summary`
+
+```bash
+curl -sS -H "Authorization: Bearer $SFTQ_API_KEY" \
+  "$SUPABASE_URL/functions/v1/jobs-api/jobs/analytics/summary"
+```
+
+Returns lifetime aggregate stats for **your** jobs:
+```json
+{
+  "total": 50,
+  "by_state": { "QUEUED": 0, "PROGRESS": 1, "SUCCESS": 25, "FAIL": 15, "CANCELLED": 9 },
+  "by_kind": { "SFT": 48, "DPO": 0, "RFT": 2 },
+  "success_rate": 0.51,
+  "avg_run_duration_seconds": 26346,
+  "total_gpu_hours": 1170.28,
+  "recent_failures": [{ "id": "...", "display_name": "...", "kind": "SFT", "gpu_count": 4, "error": "...", "failed_at": "..." }]
+}
+```
+
+- `success_rate` — successes / (successes + failures + cancellations). Null if no terminal jobs yet.
+- `avg_run_duration_seconds` — mean wall-clock time of SUCCESS jobs. Null if none.
+- `total_gpu_hours` — sum of gpu_count × run_duration / 3600 for SUCCESS jobs.
+- `recent_failures` — last 10 FAIL jobs, newest first.
+
+### Per-job analytics — `analytics job <job_id>`
+
+```bash
+curl -sS -H "Authorization: Bearer $SFTQ_API_KEY" \
+  "$SUPABASE_URL/functions/v1/jobs-api/jobs/<job_id>/analytics"
+```
+
+Returns detailed timing and GPU cost for one job (404 if not yours):
+```json
+{
+  "id": "<uuid>",
+  "display_name": "my-sft-run",
+  "kind": "SFT",
+  "state": "SUCCESS",
+  "gpu_count": 4,
+  "fireworks_job_name": "accounts/trilogy/supervisedFineTuningJobs/...",
+  "timeline": { "queued_at": "...", "started_at": "...", "completed_at": "..." },
+  "queue_wait_seconds": 23,
+  "run_duration_seconds": 160487,
+  "gpu_hours": 178.32,
+  "error": null
+}
+```
+
+- `queue_wait_seconds` — time from enqueue to admission (null if job hasn't started yet).
+- `run_duration_seconds` — time from start to completion (null if still running).
+- `gpu_hours` — gpu_count × run_duration_seconds / 3600 (null if run_duration_seconds is null).
