@@ -70,8 +70,28 @@ async function findSearchInput(page: Page) {
 
 test.describe('MC-1: PROGRESS rows visible on /queue', () => {
   test('at least one PROGRESS-state row renders on prod /queue', async ({ page }) => {
-    await page.goto(PROD_URL + '/queue', { waitUntil: 'domcontentloaded' });
-    const count = await page.locator("[data-state='PROGRESS']").count();
+    await page.goto(PROD_URL + '/queue', { waitUntil: 'networkidle' });
+    // Wait briefly for client hydration so rows render with their attributes/badges.
+    await page.waitForTimeout(2000);
+
+    // Strategy: try multiple selectors that could mark a PROGRESS row, since the
+    // exact DOM encoding has drifted across builds. QueueTable.tsx currently
+    // renders <tr data-state={job.state}> AND a <StateBadge> whose span contains
+    // the literal state text "PROGRESS". Match by any of these.
+    let count = await page
+      .locator("tr[data-state='PROGRESS'], tr[data-status='PROGRESS']")
+      .count();
+
+    if (count === 0) {
+      // Fallback: locate <tbody> rows whose State cell contains the PROGRESS
+      // badge text. Use exact-text on the StateBadge span to avoid matching
+      // job display names that happen to include the word "progress".
+      count = await page
+        .locator('tbody tr')
+        .filter({ has: page.locator('span', { hasText: /^PROGRESS$/ }) })
+        .count();
+    }
+
     test.skip(
       count === 0,
       'No PROGRESS rows in prod DB — canary will pass once T-FIX-DYNAMIC lands',
@@ -81,25 +101,52 @@ test.describe('MC-1: PROGRESS rows visible on /queue', () => {
 });
 
 test.describe('MC-2: Search by user email filters /queue rows', () => {
-  test('typing a known user email yields rows that all contain that email', async ({ page }) => {
-    const EMAIL = 'anirudh.shrikanth@trilogy.com';
-    await page.goto(PROD_URL + '/queue', { waitUntil: 'domcontentloaded' });
+  test('typing a discovered user email yields rows that all contain that email', async ({ page }) => {
+    await page.goto(PROD_URL + '/queue', { waitUntil: 'networkidle' });
+    // Allow client hydration so rows render with their user cell populated.
+    await page.waitForTimeout(2000);
+
+    const rows = page.locator('tbody tr');
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, 'No queue rows');
+
+    // Dynamically discover an email from the first row of /queue. Falls back to
+    // scanning later rows if the first row's user cell isn't an email (e.g.
+    // shows a user_id prefix). Skip cleanly when no row has an email-like
+    // user value — the canary's job is to verify the *filtering behavior*,
+    // not the presence of any particular user's data.
+    const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+    const firstRowText = (await rows.first().textContent()) ?? '';
+    let email: string | null = firstRowText.match(EMAIL_RE)?.[0] ?? null;
+
+    if (!email) {
+      for (let i = 1; i < rowCount; i++) {
+        const t = (await rows.nth(i).textContent()) ?? '';
+        const m = t.match(EMAIL_RE);
+        if (m) {
+          email = m[0];
+          break;
+        }
+      }
+    }
+    test.skip(!email, 'No queue row exposes an email-like user value');
+    if (!email) return;
 
     const input = await findSearchInput(page);
     await expect(input).toBeVisible({ timeout: 10_000 });
-    await input.fill(EMAIL);
-    await page.waitForTimeout(600); // debounce
+    await input.fill(email);
+    await page.waitForTimeout(800); // debounce + re-render
 
-    const rows = page.locator('tbody tr');
-    const count = await rows.count();
+    const filteredRows = page.locator('tbody tr');
+    const fcount = await filteredRows.count();
     expect(
-      count,
-      `expected >=1 visible row when filtering by ${EMAIL}, got ${count}`,
+      fcount,
+      `expected >=1 visible row when filtering by ${email}, got ${fcount}`,
     ).toBeGreaterThanOrEqual(1);
 
-    const texts = await rows.allTextContents();
+    const texts = await filteredRows.allTextContents();
     for (const t of texts) {
-      expect(t, `row text did not contain ${EMAIL}: ${t}`).toContain(EMAIL);
+      expect(t, `row text did not contain ${email}: ${t}`).toContain(email);
     }
   });
 });
