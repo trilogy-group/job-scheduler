@@ -172,7 +172,7 @@ export default function UserDetailPage() {
   if (loading) {
     return (
       <main className="p-6">
-        <div className="text-sm text-gray-500">Loading…</div>
+        <div className="text-sm text-gray-400">Loading…</div>
       </main>
     );
   }
@@ -258,7 +258,7 @@ export default function UserDetailPage() {
                 <tr>
                   <td
                     colSpan={7}
-                    className="px-3 py-4 text-center text-gray-500"
+                    className="px-3 py-4 text-center text-gray-400"
                   >
                     No jobs for this user.
                   </td>
