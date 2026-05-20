@@ -1,3 +1,12 @@
+## v0.3.0 — Analytics commands
+
+New read-only analytics endpoints are now available via the skill. See the Analytics section in SKILL.md for full details.
+
+Commands added:
+- analytics queue — your queue position + global depth
+- analytics summary — lifetime aggregate metrics
+- analytics job <job_id> — per-job timing and GPU cost
+
 # finetune-queue (Claude Code plugin)
 
 A Claude Code skill that routes every Fireworks fine-tuning job (SFT + DPO) through the Trilogy team's fair-scheduler queue instead of hitting Fireworks or `firectl` directly.
@@ -20,6 +29,14 @@ See [`skills/finetune-queue/SKILL.md`](skills/finetune-queue/SKILL.md). TL;DR:
 - Brief agents on the scheduler HTTP API (`POST /jobs`, `GET /jobs`, `GET /jobs/:id`, `DELETE /jobs/:id`).
 - Block them from calling `firectl supervised-fine-tuning-job` / `firectl dpoj` or the Fireworks fine-tuning HTTP API directly.
 - Document the payload shape, states, and per-user scheduling semantics inline.
+
+## Analytics
+
+Three read-only analytics endpoints are available after install — see [`skills/finetune-queue/SKILL.md`](skills/finetune-queue/SKILL.md) § Analytics:
+
+- **Queue context** — your current position, global queue depth, GPU in use.
+- **Aggregate summary** — success rate, avg run duration, total GPU-hours, recent failures.
+- **Per-job detail** — full timeline, queue wait, run duration, GPU-hours for any of your jobs.
 
 ## Configuration your agents need
 
