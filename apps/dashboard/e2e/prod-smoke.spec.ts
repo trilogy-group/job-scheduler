@@ -110,21 +110,25 @@ test.describe('MC-2: Search by user email filters /queue rows', () => {
     const rowCount = await rows.count();
     test.skip(rowCount === 0, 'No queue rows');
 
-    // Dynamically discover an email from the first row of /queue. Falls back to
-    // scanning later rows if the first row's user cell isn't an email (e.g.
-    // shows a user_id prefix). Skip cleanly when no row has an email-like
-    // user value — the canary's job is to verify the *filtering behavior*,
-    // not the presence of any particular user's data.
-    const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
-    const firstRowText = (await rows.first().textContent()) ?? '';
-    let email: string | null = firstRowText.match(EMAIL_RE)?.[0] ?? null;
+    // Dynamically discover an email from the User column (td index 2) of the
+    // first row of /queue. Falls back to scanning later rows if the first
+    // row's user cell isn't an email (e.g. shows a truncated user_id prefix
+    // with no '@'). Skip cleanly when no row has an email-like user value —
+    // the canary's job is to verify the *filtering behavior*, not the
+    // presence of any particular user's data. NOTE: we read the User cell
+    // directly rather than regex-scanning the full row textContent, because
+    // textContent concatenates all cells without separators and can produce
+    // mangled matches that span job-name + user_email + kind.
+    const firstUserCell =
+      ((await rows.first().locator('td').nth(2).textContent()) ?? '').trim();
+    let email: string | null = firstUserCell.includes('@') ? firstUserCell : null;
 
     if (!email) {
       for (let i = 1; i < rowCount; i++) {
-        const t = (await rows.nth(i).textContent()) ?? '';
-        const m = t.match(EMAIL_RE);
-        if (m) {
-          email = m[0];
+        const cell =
+          ((await rows.nth(i).locator('td').nth(2).textContent()) ?? '').trim();
+        if (cell.includes('@')) {
+          email = cell;
           break;
         }
       }
