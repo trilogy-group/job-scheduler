@@ -82,9 +82,38 @@ test.describe('MC-1: PROGRESS rows visible on /queue', () => {
 
 test.describe('MC-2: Search by user email filters /queue rows', () => {
   test('typing a known user email yields rows that all contain that email', async ({ page }) => {
-    const EMAIL = 'anirudh.shrikanth@trilogy.com';
     await page.goto(PROD_URL + '/queue', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
+    // Dynamically discover an email from the current /queue rows so the test
+    // is self-healing against churn in prod data. We scan individual <td>
+    // cells (not whole <tr>s) because tr.textContent() concatenates all
+    // cells with no separator, which causes the regex to match a glob like
+    // '<jobname><email><state>' as one token. The email column cell
+    // contains ONLY the email, so per-cell scanning is reliable.
+    const initialRows = page.locator('tbody tr');
+    const initialCount = await initialRows.count();
+    test.skip(initialCount === 0, 'No rows on /queue to discover email from');
+
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    const cells = page.locator('tbody tr td');
+    const cellCount = await cells.count();
+    let discoveredEmail: string | null = null;
+    for (let i = 0; i < cellCount; i++) {
+      const cellText = ((await cells.nth(i).textContent()) ?? '').trim();
+      if (emailRegex.test(cellText)) {
+        discoveredEmail = cellText;
+        break;
+      }
+    }
+
+    test.skip(
+      discoveredEmail === null,
+      'No rows on /queue to discover email from',
+    );
+    if (discoveredEmail === null) return;
+
+    const EMAIL = discoveredEmail;
     const input = await findSearchInput(page);
     await expect(input).toBeVisible({ timeout: 10_000 });
     await input.fill(EMAIL);
