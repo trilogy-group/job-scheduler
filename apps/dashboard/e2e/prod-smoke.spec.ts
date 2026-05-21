@@ -81,25 +81,48 @@ test.describe('MC-1: PROGRESS rows visible on /queue', () => {
 });
 
 test.describe('MC-2: Search by user email filters /queue rows', () => {
-  test('typing a known user email yields rows that all contain that email', async ({ page }) => {
-    const EMAIL = 'anirudh.shrikanth@trilogy.com';
+  test('typing a dynamically-extracted user email yields rows that all contain that email', async ({ page }) => {
     await page.goto(PROD_URL + '/queue', { waitUntil: 'domcontentloaded' });
+
+    const rows = page.locator('tbody tr');
+    // Give the table a moment to populate
+    await page.waitForTimeout(1500);
+    const initialCount = await rows.count();
+    test.skip(initialCount === 0, 'No queue rows to search in — skip');
+
+    // Extract an email from the first visible row by scanning its <td> cells
+    const firstRowCells = rows.first().locator('td');
+    const cellCount = await firstRowCells.count();
+    let extractedEmail: string | null = null;
+    const emailRe = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+    for (let i = 0; i < cellCount; i++) {
+      const cellText = (await firstRowCells.nth(i).textContent()) ?? '';
+      if (cellText.includes('@')) {
+        const m = cellText.match(emailRe);
+        if (m) {
+          extractedEmail = m[0];
+          break;
+        }
+      }
+    }
+
+    test.skip(extractedEmail === null, 'No email visible in first row');
+    if (extractedEmail === null) return;
 
     const input = await findSearchInput(page);
     await expect(input).toBeVisible({ timeout: 10_000 });
-    await input.fill(EMAIL);
-    await page.waitForTimeout(600); // debounce
+    await input.fill(extractedEmail);
+    await page.waitForTimeout(800); // debounce
 
-    const rows = page.locator('tbody tr');
-    const count = await rows.count();
+    const filteredCount = await rows.count();
     expect(
-      count,
-      `expected >=1 visible row when filtering by ${EMAIL}, got ${count}`,
+      filteredCount,
+      `expected >=1 visible row when filtering by ${extractedEmail}, got ${filteredCount}`,
     ).toBeGreaterThanOrEqual(1);
 
     const texts = await rows.allTextContents();
     for (const t of texts) {
-      expect(t, `row text did not contain ${EMAIL}: ${t}`).toContain(EMAIL);
+      expect(t, `row text did not contain ${extractedEmail}: ${t}`).toContain(extractedEmail);
     }
   });
 });

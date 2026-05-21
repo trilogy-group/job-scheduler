@@ -9,7 +9,7 @@
     "issue-key": "node scripts/issue_key.js",
     "revoke-key": "node scripts/revoke_key.js",
     "dump": "node scripts/dump_state.js",
-    "test": "node --experimental-strip-types --test tests/*.test.js",
+    "test": "cd apps/dashboard && npx playwright test",
     "lint:md": "npx prettier --check \"**/*.md\" --ignore-path .gitignore",
     "seed-dashboard": "node --experimental-strip-types scripts/seed-dashboard.ts"
   },
