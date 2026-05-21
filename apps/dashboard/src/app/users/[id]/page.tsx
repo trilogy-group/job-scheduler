@@ -234,7 +234,7 @@ export default function UserDetailPage() {
           <h2 className="text-lg font-medium">Job history</h2>
           <Link
             href={`/users/${userRow.id}?sort=${toggleSort}`}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-blue-400 hover:underline"
           >
             Sort by created_at: {sort} (toggle)
           </Link>
@@ -274,7 +274,7 @@ export default function UserDetailPage() {
                     <td className="px-3 py-2">
                       <Link
                         href={`/jobs/${j.id}`}
-                        className="text-blue-600 hover:underline"
+                        className="text-blue-400 hover:underline"
                       >
                         {j.display_name ?? j.id.slice(0, 8)}
                       </Link>
