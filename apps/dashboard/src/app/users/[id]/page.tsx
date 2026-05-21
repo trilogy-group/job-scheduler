@@ -242,15 +242,53 @@ export default function UserDetailPage() {
 
         <div className="overflow-x-auto rounded border border-gray-200">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left">
+            <thead
+              className="sticky top-0"
+              style={{ background: 'var(--bg-elev)', borderBottom: '1px solid var(--border)' }}
+            >
               <tr>
-                <th className="px-3 py-2 font-medium">Display Name</th>
-                <th className="px-3 py-2 font-medium">Kind</th>
-                <th className="px-3 py-2 font-medium">State</th>
-                <th className="px-3 py-2 font-medium">GPU</th>
-                <th className="px-3 py-2 font-medium">Created</th>
-                <th className="px-3 py-2 font-medium">Started</th>
-                <th className="px-3 py-2 font-medium">Completed</th>
+                <th
+                  className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider"
+                  style={{ color: 'var(--fg-muted)' }}
+                >
+                  Display Name
+                </th>
+                <th
+                  className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider"
+                  style={{ color: 'var(--fg-muted)' }}
+                >
+                  Kind
+                </th>
+                <th
+                  className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider"
+                  style={{ color: 'var(--fg-muted)' }}
+                >
+                  State
+                </th>
+                <th
+                  className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider"
+                  style={{ color: 'var(--fg-muted)' }}
+                >
+                  GPU
+                </th>
+                <th
+                  className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider"
+                  style={{ color: 'var(--fg-muted)' }}
+                >
+                  Created
+                </th>
+                <th
+                  className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider"
+                  style={{ color: 'var(--fg-muted)' }}
+                >
+                  Started
+                </th>
+                <th
+                  className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider"
+                  style={{ color: 'var(--fg-muted)' }}
+                >
+                  Completed
+                </th>
               </tr>
             </thead>
             <tbody>
