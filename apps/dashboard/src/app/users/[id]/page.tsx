@@ -171,15 +171,15 @@ export default function UserDetailPage() {
 
   if (loading) {
     return (
-      <main className="p-6">
+      <section className="p-6">
         <div className="text-sm text-gray-400">Loading…</div>
-      </main>
+      </section>
     );
   }
 
   if (userRow === null) {
     return (
-      <main className="p-6">
+      <section className="p-6">
         <Breadcrumb
           items={[
             { href: '/users', label: 'Users' },
@@ -190,7 +190,7 @@ export default function UserDetailPage() {
         <p className="mt-2 text-sm text-gray-600">
           No user exists with id <code>{id}</code>.
         </p>
-      </main>
+      </section>
     );
   }
 
@@ -206,7 +206,7 @@ export default function UserDetailPage() {
   const toggleSort: SortOrder = sort === 'asc' ? 'desc' : 'asc';
 
   return (
-    <main className="p-6 space-y-6">
+    <section className="p-6 space-y-6">
       <Breadcrumb
         items={[
           { href: '/users', label: 'Users' },
@@ -336,7 +336,7 @@ export default function UserDetailPage() {
         <h2 className="text-lg font-medium">Jobs over time</h2>
         <JobsOverTimeChart data={overTime} />
       </section>
-    </main>
+    </section>
   );
 }
 
