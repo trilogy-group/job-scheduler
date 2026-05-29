@@ -6,10 +6,17 @@ import type { Kind } from "../_shared/fireworks.ts";
 export const VALID_KINDS = new Set<Kind>(["SFT", "DPO", "RFT"]);
 export const TERMINAL_STATES = new Set(["SUCCESS", "FAIL", "CANCELLED"]);
 
+// GPU families the scheduler can gate per-type quota on. Mirrors the
+// jobs_gpu_type_check DB constraint (migration 0007).
+export type GpuType = "h200" | "b200" | "h100";
+export const VALID_GPU_TYPES = new Set<GpuType>(["h200", "b200", "h100"]);
+export const DEFAULT_GPU_TYPE: GpuType = "h200";
+
 export interface EnqueueInput {
   kind: Kind;
   display_name: string | null;
   gpu_count: number;
+  gpu_type: GpuType;
   fireworks_payload: Record<string, unknown>;
 }
 
@@ -55,12 +62,27 @@ export function validateEnqueue(
     return { ok: false, err: { message: "display_name must be a string" } };
   }
 
+  let gpuType: GpuType = DEFAULT_GPU_TYPE;
+  if (body.gpu_type !== undefined && body.gpu_type !== null) {
+    if (
+      typeof body.gpu_type !== "string" ||
+      !VALID_GPU_TYPES.has(body.gpu_type as GpuType)
+    ) {
+      return {
+        ok: false,
+        err: { message: "gpu_type must be 'h200', 'b200', or 'h100'" },
+      };
+    }
+    gpuType = body.gpu_type as GpuType;
+  }
+
   return {
     ok: true,
     value: {
       kind: kind as Kind,
       display_name: (displayName as string | null | undefined) ?? null,
       gpu_count: gpu,
+      gpu_type: gpuType,
       fireworks_payload: payload as Record<string, unknown>,
     },
   };

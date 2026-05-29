@@ -111,6 +111,10 @@ Deno.serve(async (req: Request) => {
     // conservatively treat them as big.
     let fwAvailable = 0;
     let bigJobsActive = 0;
+    // Per-type available GPU count keyed by gpu_type ('h200', 'b200', 'h100'),
+    // derived from each `training-<type>-count` quota. Lets admission gate a
+    // job on its SPECIFIC quota bucket before calling Fireworks (#77).
+    const perTypeQuota = new Map<string, number>();
     try {
       const [training, active, { data: knownRows, error: knownErr }] = await Promise.all([
         fw.getAllTrainingGpuQuotas(),
@@ -130,6 +134,13 @@ Deno.serve(async (req: Request) => {
       // Authoritative budget = total max − total usage across all training-* quotas.
       fwAvailable = Math.max(0, training.totalMax - training.totalUsage);
       summary.fw_quota_name = training.quotas.map((q) => q.name.replace(/^.*\//, "")).join("+");
+
+      // Per-type available count: derive gpu_type from each quota name
+      // (.../quotas/training-<type>-count) and store max(0, max − usage).
+      for (const q of training.quotas) {
+        const m = q.name.match(/\/quotas\/training-([a-z0-9]+)-count$/i);
+        if (m) perTypeQuota.set(m[1].toLowerCase(), Math.max(0, q.maxValue - q.usage));
+      }
 
       // Cross-check: sum gpu_count across active jobs (db-known + conservative bypass)
       // and warn if it materially disagrees with Fireworks' reported usage.
@@ -159,7 +170,7 @@ Deno.serve(async (req: Request) => {
       await Promise.all([
         db
           .from("jobs")
-          .select("id, user_id, kind, gpu_count, created_at")
+          .select("id, user_id, kind, gpu_count, gpu_type, created_at")
           .eq("state", "QUEUED")
           .order("created_at", { ascending: true }),
         db.from("jobs").select("user_id, gpu_count").eq("state", "PROGRESS"),
@@ -182,6 +193,7 @@ Deno.serve(async (req: Request) => {
       smallActiveByUser,
       bigActiveByUser,
       fwAvailable,
+      perTypeQuota,
       async (job) => {
         try {
           const { fireworks_payload: payload } = await fetchPayload(db, job.id);
@@ -246,7 +258,8 @@ Deno.serve(async (req: Request) => {
         summary.submission_failed++;
       }
       // skip_user_small_cap / skip_user_big_cap / skip_big_headroom /
-      // stop_insufficient_gpu / submit_quota_error: no-op
+      // skip_type_quota_insufficient / stop_insufficient_gpu /
+      // submit_quota_error: no-op (job stays QUEUED for a future tick)
     }
 
     return json(summary);

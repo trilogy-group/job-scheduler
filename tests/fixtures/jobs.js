@@ -8,8 +8,9 @@
  * @param {string} [kind='SFT'] - Job kind (e.g. 'SFT' or 'DPO').
  * @param {number} [gpu=4] - GPU count requested.
  * @param {string} [created_at] - ISO timestamp; defaults to a deterministic value derived from `id`.
- * @returns {{id: any, user_id: string, kind: string, gpu_count: number, created_at: string}}
+ * @param {string} [gpu_type='h200'] - GPU family bucket ('h200' | 'b200' | 'h100').
+ * @returns {{id: any, user_id: string, kind: string, gpu_count: number, gpu_type: string, created_at: string}}
  */
-export function mkJob(id, user, kind = 'SFT', gpu = 4, created_at = `2026-04-20T00:00:0${id}Z`) {
-  return { id, user_id: user, kind, gpu_count: gpu, created_at };
+export function mkJob(id, user, kind = 'SFT', gpu = 4, created_at = `2026-04-20T00:00:0${id}Z`, gpu_type = 'h200') {
+  return { id, user_id: user, kind, gpu_count: gpu, gpu_type, created_at };
 }

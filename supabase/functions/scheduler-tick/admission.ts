@@ -24,6 +24,7 @@ export interface QueuedJob {
   user_id: string;
   kind: Kind;
   gpu_count: number;
+  gpu_type: string; // 'h200' | 'b200' | 'h100' — which Fireworks quota bucket
   created_at: string; // ISO-8601; rows arrive already ordered
 }
 
@@ -31,6 +32,7 @@ export type AdmitOutcome =
   | { status: "skip_user_small_cap" } // user already at MAX_SMALL_JOBS_PER_USER concurrent small
   | { status: "skip_user_big_cap" }   // user already at MAX_BIG_JOBS_PER_USER concurrent big
   | { status: "skip_big_headroom" }   // admit would leave < BIG_JOB_HEADROOM_RESERVE free GPUs
+  | { status: "skip_type_quota_insufficient" } // per-type quota for job.gpu_type can't fit job → skip, keep going
   | { status: "stop_insufficient_gpu" } // earliest eligible candidate didn't fit → stop this tick
   | { status: "admit"; fireworks_job_name: string }
   | { status: "submit_quota_error" }
@@ -61,6 +63,11 @@ function bumpCount(m: Map<string, number>, k: string): void {
  *   - pass `smallActiveByUser` / `bigActiveByUser`: counts of each user's
  *     currently-PROGRESS jobs split by size bucket
  *   - pass `fwAvailable` derived from live Fireworks state
+ *   - pass `perTypeQuota`: available GPU count keyed by gpu_type ('h200',
+ *     'b200', 'h100'), derived from each `training-<type>-count` quota's
+ *     (maxValue − usage). This gates submission on the SPECIFIC quota bucket
+ *     a job draws from, so a B200 job is never submitted to Fireworks when
+ *     B200 quota is exhausted even if aggregate headroom (fwAvailable) is > 0.
  *   - perform the DB state transitions after each step in `admit`/`submit_failed`
  */
 export async function runAdmission(
@@ -68,6 +75,7 @@ export async function runAdmission(
   smallActiveByUser: Map<string, number>,
   bigActiveByUser: Map<string, number>,
   fwAvailable: number,
+  perTypeQuota: Map<string, number>,
   submit: SubmitFn,
 ): Promise<AdmissionStep[]> {
   const steps: AdmissionStep[] = [];
@@ -75,6 +83,7 @@ export async function runAdmission(
   // Local copies so we can mutate as we admit within this tick.
   const smallByUser = new Map(smallActiveByUser);
   const bigByUser = new Map(bigActiveByUser);
+  const typeBudget = new Map(perTypeQuota);
 
   for (const job of queued) {
     const isBig = job.gpu_count >= BIG_JOB_GPU_THRESHOLD;
@@ -104,9 +113,23 @@ export async function runAdmission(
       break;
     }
 
+    // Per-type quota gate (GitHub #77): even when aggregate budget has room,
+    // the SPECIFIC quota bucket this job draws from (e.g. training-b200-count)
+    // may be exhausted. Submitting anyway would make Fireworks return a 429
+    // quota error AFTER the call. Skip (don't stop) so jobs of a different
+    // type behind this one can still be admitted this tick.
+    if ((typeBudget.get(job.gpu_type) ?? 0) < job.gpu_count) {
+      steps.push({ job, outcome: { status: "skip_type_quota_insufficient" } });
+      continue;
+    }
+
     const result = await submit(job);
     if (result.ok) {
       budget -= job.gpu_count;
+      typeBudget.set(
+        job.gpu_type,
+        (typeBudget.get(job.gpu_type) ?? 0) - job.gpu_count,
+      );
       if (isBig) bumpCount(bigByUser, job.user_id);
       else bumpCount(smallByUser, job.user_id);
       steps.push({

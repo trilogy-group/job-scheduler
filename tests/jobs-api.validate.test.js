@@ -63,6 +63,32 @@ test('validateEnqueue rejects non-string display_name', () => {
   assert.equal(r.ok, false);
 });
 
+test('validateEnqueue defaults gpu_type to h200 when omitted', () => {
+  const r = validateEnqueue({ kind: 'SFT', fireworks_payload: { baseModel: 'x' } });
+  assert.equal(r.ok, true);
+  assert.equal(r.value.gpu_type, 'h200');
+});
+
+test('validateEnqueue accepts valid gpu_type values', () => {
+  for (const t of ['h200', 'b200', 'h100']) {
+    const r = validateEnqueue({ kind: 'SFT', gpu_type: t, fireworks_payload: {} });
+    assert.equal(r.ok, true, `gpu_type ${t} should be accepted`);
+    assert.equal(r.value.gpu_type, t);
+  }
+});
+
+test('validateEnqueue rejects unknown gpu_type', () => {
+  const r = validateEnqueue({ kind: 'SFT', gpu_type: 'a100', fireworks_payload: {} });
+  assert.equal(r.ok, false);
+  assert.match(r.err.message, /gpu_type must be/);
+});
+
+test('validateEnqueue rejects non-string gpu_type', () => {
+  const r = validateEnqueue({ kind: 'SFT', gpu_type: 200, fireworks_payload: {} });
+  assert.equal(r.ok, false);
+  assert.match(r.err.message, /gpu_type must be/);
+});
+
 test('validateEnqueue rejects non-object body', () => {
   assert.equal(validateEnqueue(null).ok, false);
   assert.equal(validateEnqueue('hi').ok, false);

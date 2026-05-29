@@ -18,6 +18,10 @@ function alwaysOk(namePrefix = 'fw-') {
 }
 
 const M = (entries = []) => new Map(entries);
+// Per-type GPU quota map. Defaults to ample h200 headroom so the pre-existing
+// (all-h200) admission tests exercise the same paths as before #77. Pass an
+// explicit map to gate on a specific GPU family.
+const PT = (entries = [['h200', 1000]]) => new Map(entries);
 
 test('expected constants', () => {
   assert.equal(MAX_SMALL_JOBS_PER_USER, 2);
@@ -27,7 +31,7 @@ test('expected constants', () => {
 
 test('FIFO: simple queue with budget to spare', async () => {
   const queue = [mkJob(1, 'alice'), mkJob(2, 'bob')];
-  const steps = await runAdmission(queue, M(), M(), 8, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 8, PT(), alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), ['admit', 'admit']);
 });
 
@@ -35,7 +39,7 @@ test('per-user small cap: 3 small from same user → admit 2, skip 3rd', async (
   const queue = [
     mkJob(1, 'praveen'), mkJob(2, 'praveen'), mkJob(3, 'praveen'),
   ];
-  const steps = await runAdmission(queue, M(), M(), 16, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 16, PT(), alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), [
     'admit', 'admit', 'skip_user_small_cap',
   ]);
@@ -44,48 +48,48 @@ test('per-user small cap: 3 small from same user → admit 2, skip 3rd', async (
 test('per-user small cap: prior active counts toward cap', async () => {
   // alice already has 1 small running; she can admit 1 more, then capped.
   const queue = [mkJob(1, 'alice'), mkJob(2, 'alice')];
-  const steps = await runAdmission(queue, M([['alice', 1]]), M(), 16, alwaysOk());
+  const steps = await runAdmission(queue, M([['alice', 1]]), M(), 16, PT(), alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), ['admit', 'skip_user_small_cap']);
 });
 
 test('per-user small cap is per-user: bob unaffected when alice is capped', async () => {
   // alice already at small cap. bob can still admit. alice's queued small is skipped (continue-style).
   const queue = [mkJob(1, 'alice'), mkJob(2, 'bob')];
-  const steps = await runAdmission(queue, M([['alice', 2]]), M(), 8, alwaysOk());
+  const steps = await runAdmission(queue, M([['alice', 2]]), M(), 8, PT(), alwaysOk());
   assert.equal(steps[0].outcome.status, 'skip_user_small_cap');
   assert.equal(steps[1].outcome.status, 'admit');
 });
 
 test('per-user big cap: 2 bigs from same user → admit 1, skip 2nd', async () => {
   const queue = [mkJob(1, 'alice', 'SFT', 8), mkJob(2, 'alice', 'SFT', 8)];
-  const steps = await runAdmission(queue, M(), M(), 32, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 32, PT(), alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), ['admit', 'skip_user_big_cap']);
 });
 
 test('per-user big cap: prior big active blocks user', async () => {
   const queue = [mkJob(1, 'alice', 'SFT', 8)];
-  const steps = await runAdmission(queue, M(), M([['alice', 1]]), 32, alwaysOk());
+  const steps = await runAdmission(queue, M(), M([['alice', 1]]), 32, PT(), alwaysOk());
   assert.equal(steps[0].outcome.status, 'skip_user_big_cap');
 });
 
 test('big-headroom rule: big job with insufficient post-admit headroom is skipped', async () => {
   // budget=10, big job wants 8. 10-8=2 < 4 → skip_big_headroom.
   const queue = [mkJob(1, 'alice', 'SFT', 8)];
-  const steps = await runAdmission(queue, M(), M(), 10, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 10, PT(), alwaysOk());
   assert.equal(steps[0].outcome.status, 'skip_big_headroom');
 });
 
 test('big-headroom rule: at the boundary (post-admit headroom = 4) admits', async () => {
   // budget=12, big wants 8. 12-8=4 → 4 >= 4 → admit.
   const queue = [mkJob(1, 'alice', 'SFT', 8)];
-  const steps = await runAdmission(queue, M(), M(), 12, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 12, PT(), alwaysOk());
   assert.equal(steps[0].outcome.status, 'admit');
 });
 
 test('big-headroom rule: skipped big does not block smaller queued job', async () => {
   // budget=10, big8 can't fit headroom, but small4 behind it can admit.
   const queue = [mkJob(1, 'alice', 'SFT', 8), mkJob(2, 'bob', 'SFT', 4)];
-  const steps = await runAdmission(queue, M(), M(), 10, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 10, PT(), alwaysOk());
   assert.equal(steps[0].outcome.status, 'skip_big_headroom');
   assert.equal(steps[1].outcome.status, 'admit');
 });
@@ -101,7 +105,7 @@ test('big admissions across multiple users: budget+headroom limits the count', a
     mkJob(3, 'carol', 'SFT', 8),
     mkJob(4, 'dave',  'SFT', 8),
   ];
-  const steps = await runAdmission(queue, M(), M(), 32, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 32, PT(), alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), [
     'admit', 'admit', 'admit', 'skip_big_headroom',
   ]);
@@ -117,7 +121,7 @@ test('mixed queue: bigs and smalls coexist under the new rules', async () => {
     mkJob(2, 'bob',   'SFT', 4),
     mkJob(3, 'alice', 'SFT', 4),
   ];
-  const steps = await runAdmission(queue, M(), M(), 24, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 24, PT(), alwaysOk());
   assert.deepEqual(steps.map((s) => s.outcome.status), ['admit', 'admit', 'admit']);
 });
 
@@ -126,7 +130,7 @@ test('FIFO across kinds: DPO before SFT if earlier created_at; both admit since 
     mkJob(1, 'alice', 'DPO', 4, '2026-04-20T00:00:00Z'),
     mkJob(2, 'alice', 'SFT', 4, '2026-04-20T00:00:01Z'),
   ];
-  const steps = await runAdmission(queue, M(), M(), 8, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 8, PT(), alwaysOk());
   assert.equal(steps[0].outcome.status, 'admit');
   assert.equal(steps[0].job.kind, 'DPO');
   assert.equal(steps[1].outcome.status, 'admit');
@@ -136,7 +140,7 @@ test('FIFO across kinds: DPO before SFT if earlier created_at; both admit since 
 test('insufficient_gpu still stops for small candidates', async () => {
   // budget=2, small wants 4: can't fit even though cap is fine. Per spec, stop.
   const queue = [mkJob(1, 'alice'), mkJob(2, 'bob')];
-  const steps = await runAdmission(queue, M(), M(), 2, alwaysOk());
+  const steps = await runAdmission(queue, M(), M(), 2, PT(), alwaysOk());
   assert.equal(steps[0].outcome.status, 'stop_insufficient_gpu');
   assert.equal(steps.length, 1);
 });
@@ -150,7 +154,7 @@ test('quota error stops admission for the rest of the tick', async () => {
     if (call === 2) return { ok: false, kind: 'quota' };
     throw new Error('should not be called after quota error');
   };
-  const steps = await runAdmission(queue, M(), M(), 12, submit);
+  const steps = await runAdmission(queue, M(), M(), 12, PT(), submit);
   assert.equal(steps[0].outcome.status, 'admit');
   assert.equal(steps[1].outcome.status, 'submit_quota_error');
   assert.equal(steps.length, 2);
@@ -162,13 +166,66 @@ test('non-quota 4xx marks FAIL and continues', async () => {
     if (job.id === 1) return { ok: false, kind: 'client_error', status: 400, body: 'bad payload' };
     return { ok: true, fireworks_job_name: 'fw-2' };
   };
-  const steps = await runAdmission(queue, M(), M(), 8, submit);
+  const steps = await runAdmission(queue, M(), M(), 8, PT(), submit);
   assert.equal(steps[0].outcome.status, 'submit_failed');
   assert.equal(steps[0].outcome.status_code, 400);
   assert.equal(steps[1].outcome.status, 'admit');
 });
 
 test('empty queue returns empty steps', async () => {
-  const steps = await runAdmission([], M(), M(), 8, alwaysOk());
+  const steps = await runAdmission([], M(), M(), 8, PT(), alwaysOk());
   assert.deepEqual(steps, []);
+});
+
+// --- Per-type GPU quota gate (#77) -----------------------------------------
+// Regression: B200 jobs were submitted to Fireworks and only rejected by a
+// 429 quota error AFTER the createJob() call, because admission gated on the
+// AGGREGATE budget. These lock in that submit() is never reached for a job
+// whose specific GPU family is exhausted, even when aggregate headroom exists.
+
+test('per-type quota (a): B200 job skipped when B200 quota=0 but aggregate>0', async () => {
+  // Aggregate budget 16 (H200 slots free), but B200 quota is exhausted.
+  const queue = [mkJob(1, 'alice', 'SFT', 4, '2026-04-20T00:00:01Z', 'b200')];
+  const perType = M([['h200', 16], ['b200', 0]]);
+  let submitCalls = 0;
+  const submit = async (job) => {
+    submitCalls++;
+    return { ok: true, fireworks_job_name: 'fw-' + job.id };
+  };
+  const steps = await runAdmission(queue, M(), M(), 16, perType, submit);
+  assert.equal(steps[0].outcome.status, 'skip_type_quota_insufficient');
+  // The invariant: submit() must NOT have been called for the exhausted type.
+  assert.equal(submitCalls, 0);
+});
+
+test('per-type quota (b): H200 job still admitted when only B200 is exhausted', async () => {
+  // A queued B200 job (exhausted) must not block a later H200 job that fits.
+  const queue = [
+    mkJob(1, 'alice', 'SFT', 4, '2026-04-20T00:00:01Z', 'b200'),
+    mkJob(2, 'bob', 'SFT', 4, '2026-04-20T00:00:02Z', 'h200'),
+  ];
+  const perType = M([['h200', 16], ['b200', 0]]);
+  const steps = await runAdmission(queue, M(), M(), 16, perType, alwaysOk());
+  assert.equal(steps[0].outcome.status, 'skip_type_quota_insufficient');
+  assert.equal(steps[1].outcome.status, 'admit');
+  assert.equal(steps[1].job.gpu_type, 'h200');
+});
+
+test('per-type quota (c): quota-allowed happy path unchanged (B200 admitted)', async () => {
+  const queue = [mkJob(1, 'alice', 'SFT', 4, '2026-04-20T00:00:01Z', 'b200')];
+  const perType = M([['h200', 8], ['b200', 8]]);
+  const steps = await runAdmission(queue, M(), M(), 16, perType, alwaysOk());
+  assert.equal(steps[0].outcome.status, 'admit');
+});
+
+test('per-type quota: budget decrements per type across the tick', async () => {
+  // Two 4-GPU B200 jobs, B200 quota=4 → only the first fits; second skipped.
+  const queue = [
+    mkJob(1, 'alice', 'SFT', 4, '2026-04-20T00:00:01Z', 'b200'),
+    mkJob(2, 'bob', 'SFT', 4, '2026-04-20T00:00:02Z', 'b200'),
+  ];
+  const perType = M([['b200', 4], ['h200', 100]]);
+  const steps = await runAdmission(queue, M(), M(), 100, perType, alwaysOk());
+  assert.equal(steps[0].outcome.status, 'admit');
+  assert.equal(steps[1].outcome.status, 'skip_type_quota_insufficient');
 });

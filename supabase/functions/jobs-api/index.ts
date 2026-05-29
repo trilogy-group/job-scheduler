@@ -89,9 +89,10 @@ async function handleCreate(req: Request, db, userId: string): Promise<Response>
       state: "QUEUED",
       display_name: v.value.display_name,
       gpu_count: v.value.gpu_count,
+      gpu_type: v.value.gpu_type,
       fireworks_payload: v.value.fireworks_payload,
     })
-    .select("id, kind, state, created_at")
+    .select("id, kind, state, gpu_type, created_at")
     .single();
 
   if (dbErr) return error(500, "insert failed", { detail: dbErr.message });
@@ -102,7 +103,7 @@ async function handleList(url: URL, db, userId: string): Promise<Response> {
   let q = db
     .from("jobs")
     .select(
-      "id, kind, state, display_name, gpu_count, created_at, started_at, completed_at, error, fireworks_job_name",
+      "id, kind, state, display_name, gpu_count, gpu_type, created_at, started_at, completed_at, error, fireworks_job_name",
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
@@ -121,7 +122,7 @@ async function handleGetOne(id: string, db, userId: string): Promise<Response> {
   const { data, error: dbErr } = await db
     .from("jobs")
     .select(
-      "id, kind, state, display_name, gpu_count, created_at, started_at, completed_at, error, fireworks_job_name, user_id",
+      "id, kind, state, display_name, gpu_count, gpu_type, created_at, started_at, completed_at, error, fireworks_job_name, user_id",
     )
     .eq("id", id)
     .maybeSingle();
