@@ -111,6 +111,10 @@ Deno.serve(async (req: Request) => {
     // conservatively treat them as big.
     let fwAvailable = 0;
     let bigJobsActive = 0;
+    // Available GPUs per type (h200/b200/h100, ...), derived from each
+    // `training-<type>-count` quota. Lets admission gate on the specific
+    // GPU type a job requests rather than only the aggregate headroom.
+    const perTypeQuota = new Map<string, number>();
     try {
       const [training, active, { data: knownRows, error: knownErr }] = await Promise.all([
         fw.getAllTrainingGpuQuotas(),
@@ -130,6 +134,14 @@ Deno.serve(async (req: Request) => {
       // Authoritative budget = total max − total usage across all training-* quotas.
       fwAvailable = Math.max(0, training.totalMax - training.totalUsage);
       summary.fw_quota_name = training.quotas.map((q) => q.name.replace(/^.*\//, "")).join("+");
+
+      // Per-type availability: parse the GPU type out of each
+      // `training-<type>-count` quota name and store limit − usage.
+      for (const q of training.quotas) {
+        const m = q.name.match(/training-([a-z0-9]+)-count$/i);
+        if (!m) continue;
+        perTypeQuota.set(m[1].toLowerCase(), Math.max(0, q.maxValue - q.usage));
+      }
 
       // Cross-check: sum gpu_count across active jobs (db-known + conservative bypass)
       // and warn if it materially disagrees with Fireworks' reported usage.
@@ -159,7 +171,7 @@ Deno.serve(async (req: Request) => {
       await Promise.all([
         db
           .from("jobs")
-          .select("id, user_id, kind, gpu_count, created_at")
+          .select("id, user_id, kind, gpu_count, gpu_type, created_at")
           .eq("state", "QUEUED")
           .order("created_at", { ascending: true }),
         db.from("jobs").select("user_id, gpu_count").eq("state", "PROGRESS"),
@@ -182,6 +194,7 @@ Deno.serve(async (req: Request) => {
       smallActiveByUser,
       bigActiveByUser,
       fwAvailable,
+      perTypeQuota,
       async (job) => {
         try {
           const { fireworks_payload: payload } = await fetchPayload(db, job.id);
