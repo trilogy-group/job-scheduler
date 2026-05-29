@@ -108,8 +108,11 @@ export async function runAdmission(
     // Even when the aggregate budget has room (e.g. free H200 slots), the
     // job's specific GPU type may be exhausted; skip rather than letting
     // Fireworks reject the submit with a 429.
-    const typeAvail = typeQuota.get(job.gpu_type) ?? 0;
-    if (typeAvail < job.gpu_count) {
+    // undefined = Fireworks has no quota entry for this type; allow passthrough
+    // so the job is not silently stalled — it will succeed or get an explicit
+    // submit_quota_error / submit_failed response from Fireworks instead.
+    const typeAvail = typeQuota.get(job.gpu_type);
+    if (typeAvail !== undefined && typeAvail < job.gpu_count) {
       steps.push({ job, outcome: { status: "skip_type_quota_insufficient" } });
       continue;
     }

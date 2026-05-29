@@ -42,6 +42,7 @@ Deno.serve(async (req: Request) => {
       reconciled: 0,
       admitted: 0,
       submission_failed: 0,
+      skipped_type_quota: 0,
       queued_remaining: 0,
       fw_available: 0,
       big_jobs_active: 0,
@@ -257,9 +258,11 @@ Deno.serve(async (req: Request) => {
           .eq("id", step.job.id)
           .eq("state", "QUEUED");
         summary.submission_failed++;
+      } else if (step.outcome.status === "skip_type_quota_insufficient") {
+        summary.skipped_type_quota++;
       }
       // skip_user_small_cap / skip_user_big_cap / skip_big_headroom /
-      // stop_insufficient_gpu / submit_quota_error: no-op
+      // skip_type_quota_insufficient / stop_insufficient_gpu / submit_quota_error: no-op
     }
 
     return json(summary);

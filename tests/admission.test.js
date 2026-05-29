@@ -211,3 +211,21 @@ test('quota-allowed happy path: sufficient per-type + aggregate admits job', asy
   const steps = await runAdmission(queue, M(), M(), 16, perType, alwaysOk());
   assert.equal(steps[0].outcome.status, 'admit');
 });
+
+test('passthrough: job with GPU type absent from perTypeQuota map is admitted (not silently stalled)', async () => {
+  // perTypeQuota only has 'h200'; job requests 'b300' (not in map).
+  // With the ?? 0 bug this would emit skip_type_quota_insufficient every tick forever.
+  // With the fix (undefined-guard) it passes through to submit().
+  const queue = [{ ...mkJob(1, 'alice', 'SFT', 4), gpu_type: 'b300' }];
+  const perType = new Map([['h200', 16]]);
+  const steps = await runAdmission(queue, M(), M(), 16, perType, alwaysOk());
+  assert.equal(steps[0].outcome.status, 'admit');
+});
+
+test('passthrough: skip_type_quota_insufficient still fires when type IS in map but exhausted', async () => {
+  // Regression guard: the undefined-guard must not break the still-exhausted case.
+  const queue = [{ ...mkJob(1, 'alice', 'SFT', 4), gpu_type: 'h200' }];
+  const perType = new Map([['h200', 0]]);
+  const steps = await runAdmission(queue, M(), M(), 16, perType, alwaysOk());
+  assert.equal(steps[0].outcome.status, 'skip_type_quota_insufficient');
+});
