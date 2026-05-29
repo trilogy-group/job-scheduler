@@ -59,6 +59,7 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
   );
   const [selectedJob, setSelectedJob] = useState<JobEnriched | null>(null);
   const [orphanRows, setOrphanRows] = useState<JobEnriched[]>([]);
+  const [fwError, setFwError] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,8 +73,19 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
     (async () => {
       try {
         const res = await fetch('/api/fireworks-jobs');
-        if (!res.ok) return;
-        const body = (await res.json()) as { jobs?: FireworksJobSummaryClient[] };
+        if (!res.ok) {
+          if (!cancelled) setFwError(true);
+          return;
+        }
+        const body = (await res.json()) as {
+          jobs?: FireworksJobSummaryClient[];
+          error?: string;
+        };
+        if (body.error) {
+          if (!cancelled) setFwError(true);
+          return;
+        }
+        if (!cancelled) setFwError(false);
         const fwJobs = body.jobs ?? [];
         const known = new Set(
           jobs
@@ -104,7 +116,8 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
           }));
         if (!cancelled) setOrphanRows(orphans);
       } catch {
-        // ignore — orphan poller is best-effort
+        // network/parse failure — surface as a backend error banner
+        if (!cancelled) setFwError(true);
       }
     })();
     return () => {
@@ -208,6 +221,15 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
           {filtered.length} jobs
         </span>
       </div>
+      {fwError && (
+        <div
+          data-testid="fireworks-error-banner"
+          role="alert"
+          className="mb-3 rounded-md border border-[var(--color-bad)] bg-[var(--bg-elev)] px-3 py-2 text-sm font-medium text-[var(--color-bad)]"
+        >
+          Could not load jobs — backend error
+        </div>
+      )}
       {filtered.length === 0 ? (
         <div
           data-testid="empty-state"

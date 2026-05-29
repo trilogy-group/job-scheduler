@@ -380,3 +380,19 @@ test.describe('user-detail-consistency', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------
+// API-HEALTH — non-skippable backend health check. Guards against the failure
+// mode where /api/fireworks-jobs returns 500 (e.g. FIREWORKS_API_KEY missing
+// from the Amplify branch-level env) but row-dependent UI tests skip because
+// the queue renders 0 rows, masking the outage.
+// ---------------------------------------------------------------------------
+test.describe('api-health', () => {
+  test('fireworks-jobs API returns 200', async ({ request }) => {
+    const res = await request.get(PROD_URL + '/api/fireworks-jobs');
+    expect(
+      res.status(),
+      `GET /api/fireworks-jobs returned ${res.status()} (expected 200)`,
+    ).toBe(200);
+  });
+});
