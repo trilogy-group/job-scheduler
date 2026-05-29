@@ -4,12 +4,14 @@
 import type { Kind } from "../_shared/fireworks.ts";
 
 export const VALID_KINDS = new Set<Kind>(["SFT", "DPO", "RFT"]);
+export const VALID_GPU_TYPES = new Set(["h100", "h200", "a100", "b200", "b300"]);
 export const TERMINAL_STATES = new Set(["SUCCESS", "FAIL", "CANCELLED"]);
 
 export interface EnqueueInput {
   kind: Kind;
   display_name: string | null;
   gpu_count: number;
+  gpu_type: string;
   fireworks_payload: Record<string, unknown>;
 }
 
@@ -55,12 +57,24 @@ export function validateEnqueue(
     return { ok: false, err: { message: "display_name must be a string" } };
   }
 
+  let gpuType = "h200";
+  if (body.gpu_type !== undefined) {
+    if (typeof body.gpu_type !== "string" || !VALID_GPU_TYPES.has(body.gpu_type)) {
+      return {
+        ok: false,
+        err: { message: "gpu_type must be one of: h100, h200, a100, b200, b300" },
+      };
+    }
+    gpuType = body.gpu_type;
+  }
+
   return {
     ok: true,
     value: {
       kind: kind as Kind,
       display_name: (displayName as string | null | undefined) ?? null,
       gpu_count: gpu,
+      gpu_type: gpuType,
       fireworks_payload: payload as Record<string, unknown>,
     },
   };

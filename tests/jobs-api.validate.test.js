@@ -69,6 +69,24 @@ test('validateEnqueue rejects non-object body', () => {
   assert.equal(validateEnqueue(42).ok, false);
 });
 
+test('validateEnqueue accepts valid gpu_type b200', () => {
+  const r = validateEnqueue({ kind: 'SFT', fireworks_payload: { baseModel: 'x' }, gpu_type: 'b200' });
+  assert.equal(r.ok, true);
+  assert.equal(r.value.gpu_type, 'b200');
+});
+
+test('validateEnqueue defaults gpu_type to h200 when omitted', () => {
+  const r = validateEnqueue({ kind: 'SFT', fireworks_payload: { baseModel: 'x' } });
+  assert.equal(r.ok, true);
+  assert.equal(r.value.gpu_type, 'h200');
+});
+
+test('validateEnqueue rejects unknown gpu_type', () => {
+  const r = validateEnqueue({ kind: 'SFT', fireworks_payload: { baseModel: 'x' }, gpu_type: 'v100' });
+  assert.equal(r.ok, false);
+  assert.match(r.err.message, /gpu_type must be one of/);
+});
+
 test('bearerToken extracts the token', () => {
   const req = new Request('http://x/', { headers: { Authorization: 'Bearer sftq_abc' } });
   assert.equal(bearerToken(req), 'sftq_abc');
