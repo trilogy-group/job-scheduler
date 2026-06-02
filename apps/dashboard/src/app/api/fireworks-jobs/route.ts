@@ -27,7 +27,7 @@ export interface FireworksJobSummary {
 export async function GET() {
   const apiKey = process.env.FIREWORKS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'FIREWORKS_API_KEY not configured' }, { status: 500 });
+    return NextResponse.json({ jobs: [], configured: false }, { status: 200 });
   }
 
   const results = await Promise.allSettled(
