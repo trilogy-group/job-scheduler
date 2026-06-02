@@ -13,13 +13,14 @@ describe('GET /api/fireworks-jobs (T-ORPHAN-POLLER)', () => {
     else process.env.FIREWORKS_API_KEY = ORIG_KEY;
   });
 
-  it('returns 500 when FIREWORKS_API_KEY is not set', async () => {
+  it('returns 200 with empty jobs and configured:false when FIREWORKS_API_KEY is not set', async () => {
     delete process.env.FIREWORKS_API_KEY;
     const mod = await import('@/app/api/fireworks-jobs/route');
     const res = await mod.GET();
-    expect(res.status).toBe(500);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toMatch(/FIREWORKS_API_KEY/);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { jobs: unknown[]; configured: boolean };
+    expect(body.jobs).toEqual([]);
+    expect(body.configured).toBe(false);
   });
 
   it('fetches all 3 endpoints and merges non-terminal jobs', async () => {

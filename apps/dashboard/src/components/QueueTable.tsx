@@ -80,7 +80,12 @@ export function QueueTable({ jobs }: { jobs: JobEnriched[] }) {
         const body = (await res.json()) as {
           jobs?: FireworksJobSummaryClient[];
           error?: string;
+          configured?: boolean;
         };
+        if (body.configured === false) {
+          // Missing-key case: degrade silently (no orphan rows, no error banner).
+          return;
+        }
         if (body.error) {
           if (!cancelled) setFwError(true);
           return;
