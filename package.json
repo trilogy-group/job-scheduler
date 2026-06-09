@@ -11,7 +11,8 @@
     "dump": "node scripts/dump_state.js",
     "test": "node --experimental-strip-types --test tests/*.test.js",
     "lint:md": "npx prettier --check \"**/*.md\" --ignore-path .gitignore",
-    "seed-dashboard": "node --experimental-strip-types scripts/seed-dashboard.ts"
+    "seed-dashboard": "node --experimental-strip-types scripts/seed-dashboard.ts",
+    "test:mode-f": "npx playwright test --config apps/dashboard/playwright.config.mode-f.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -21,6 +22,7 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "prettier": "^3.8.3"
   }
 }
