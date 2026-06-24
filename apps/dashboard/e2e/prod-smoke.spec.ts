@@ -335,6 +335,8 @@ test.describe("user-detail-consistency: list count matches detail count", () => 
 
     await expect(page).toHaveURL(/\/users\/[0-9a-f-]{36}/, { timeout: 8000 });
 
+    await expect(page.locator('main')).not.toContainText('Loading…', { timeout: 15000 });
+
     const detailRows = page.locator("table tbody tr");
     const detailRowCount = await detailRows.count();
 
@@ -372,7 +374,8 @@ test.describe('user-detail-consistency', () => {
       await page.waitForTimeout(1500);
       const row = page.locator('tbody tr').nth(i);
       await row.click();
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(3000);
+      await expect(page).toHaveURL(/\/users\/[0-9a-f-]{36}/, { timeout: 8000 });
       const status = page.locator('[data-testid="error-404"], h1:has-text("404"), h1:has-text("Not Found")');
       const is404 = (await status.count()) > 0;
       expect(is404, `User row ${i} navigated to a 404 page: ${page.url()}`).toBe(false);
