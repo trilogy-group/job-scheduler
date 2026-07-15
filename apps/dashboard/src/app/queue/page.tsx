@@ -7,6 +7,23 @@ import type { JobEnriched } from "@/lib/types";
 
 export default function QueuePage() {
   const [jobs, setJobs] = useState<JobEnriched[] | null>(null);
+  const [configured, setConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelledCfg = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/fireworks-jobs", { cache: "no-store" });
+        const body = (await res.json()) as { configured?: boolean };
+        if (!cancelledCfg) setConfigured(body.configured === false ? false : true);
+      } catch (err) {
+        console.error("[QueuePage] fireworks-jobs config check failed:", err);
+      }
+    })();
+    return () => {
+      cancelledCfg = true;
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = createBrowserClient();
@@ -60,6 +77,20 @@ export default function QueuePage() {
       <h1 className="text-xl font-semibold tracking-tight mb-4" style={{ color: 'var(--fg)' }}>
         Active Queue
       </h1>
+      {configured === false && (
+        <div
+          data-testid="configured-false-banner"
+          role="alert"
+          className="rounded-md border px-4 py-3 text-sm"
+          style={{
+            borderColor: 'var(--warning-border, #f59e0b)',
+            background: 'var(--warning-bg, #fef3c7)',
+            color: 'var(--warning-fg, #92400e)',
+          }}
+        >
+          Queue data unavailable — Fireworks API not configured on this deployment.
+        </div>
+      )}
       {jobs === null ? (
         <div className="py-12 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>Loading queue…</div>
       ) : (

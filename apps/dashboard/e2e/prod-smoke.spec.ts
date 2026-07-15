@@ -394,5 +394,9 @@ test.describe('api-health', () => {
       res.status(),
       `GET /api/fireworks-jobs returned ${res.status()} (expected 200)`,
     ).toBe(200);
+    const body = await res.json();
+    // Assert configured===true. If false, the FIREWORKS_API_KEY is not reaching the Lambda.
+    // This is non-skippable: a false here means the queue will always show 0 rows.
+    expect(body.configured, 'fireworks-jobs API returned configured:false - FIREWORKS_API_KEY not accessible to Lambda').not.toBe(false);
   });
 });
