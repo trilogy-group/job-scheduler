@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { StateBadge } from '@/components/StateBadge';
@@ -120,6 +120,20 @@ function fmtHours(value: number): string {
 }
 
 export default function UserDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="p-6">
+          <div className="text-sm text-gray-400">Loading…</div>
+        </section>
+      }
+    >
+      <UserDetailContent />
+    </Suspense>
+  );
+}
+
+function UserDetailContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const id = (params?.id ?? '') as string;
