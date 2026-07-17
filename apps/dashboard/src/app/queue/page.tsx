@@ -77,7 +77,7 @@ export default function QueuePage() {
       <h1 className="text-xl font-semibold tracking-tight mb-4" style={{ color: 'var(--fg)' }}>
         Active Queue
       </h1>
-      {configured === false && (
+      {configured === false && (jobs === null || jobs.length === 0) && (
         <div
           data-testid="configured-false-banner"
           role="alert"
